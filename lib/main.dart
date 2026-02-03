@@ -1,4 +1,180 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'siswa_detail_page.dart';
+import 'login_page.dart';
+import 'splash_screen.dart';
+import 'presensi_page.dart';
+import 'ijin_online_page.dart';
+import 'daftar_ijin_page.dart';
+import 'keluar_kelas_page.dart';
+import 'riwayat_izin_page.dart';
+
+// API Configuration
+const String API_BASE_URL = 'https://apps.smkn2semarang.sch.id/api';
+const String LOGIN_ENDPOINT = '/login';
+
+class AuthService {
+  static Future<Map<String, dynamic>> loginWithAPI(
+    String username,
+    String password,
+  ) async {
+    try {
+      final url = '$API_BASE_URL$LOGIN_ENDPOINT';
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+      final body = jsonEncode({'username': username, 'password': password});
+
+      final response = await http
+          .post(Uri.parse(url), headers: headers, body: body)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        String? userName =
+            jsonResponse['user']?['name'] ?? jsonResponse['name'];
+        String? userId = jsonResponse['user']?['id'];
+        String? siswaId =
+            jsonResponse['user']?['siswaId'] ?? jsonResponse['siswaId'];
+
+        return {
+          'success': true,
+          'message': 'Login successful',
+          'data': jsonResponse,
+          'token': jsonResponse['token'] ?? null,
+          'userName': userName,
+          'userId': userId,
+          'siswaId': siswaId,
+        };
+      } else if (response.statusCode == 401) {
+        return {'success': false, 'message': 'Invalid username or password'};
+      } else if (response.statusCode == 422) {
+        final jsonResponse = jsonDecode(response.body);
+
+        return {
+          'success': false,
+          'message': jsonResponse['message'] ?? 'Validation error',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': 'Server error: ${response.statusCode}',
+        };
+      }
+    } on Exception catch (e) {
+      return {'success': false, 'message': 'Connection error: ${e.toString()}'};
+    }
+  }
+}
+
+class SessionManager {
+  static bool isLoggedIn = false;
+  static String? currentUsername;
+  static String? currentUserName; // Full name of the user
+  static String? userId; // Store user ID from API
+  static String? authToken; // Store the auth token from API
+  static String? siswaId; // Store siswa ID from API
+
+  // SharedPreferences keys
+  static const String _isLoggedInKey = 'is_logged_in';
+  static const String _usernameKey = 'username';
+  static const String _userNameKey = 'user_name';
+  static const String _userIdKey = 'user_id';
+  static const String _authTokenKey = 'auth_token';
+  static const String _siswaIdKey = 'siswa_id';
+
+  // Save session to local storage
+  static Future<void> _saveSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isLoggedInKey, isLoggedIn);
+    if (currentUsername != null) {
+      await prefs.setString(_usernameKey, currentUsername!);
+    }
+    if (currentUserName != null) {
+      await prefs.setString(_userNameKey, currentUserName!);
+    }
+    if (userId != null) {
+      await prefs.setString(_userIdKey, userId!);
+    }
+    if (authToken != null) {
+      await prefs.setString(_authTokenKey, authToken!);
+    }
+    if (siswaId != null) {
+      await prefs.setString(_siswaIdKey, siswaId!);
+    }
+  }
+
+  // Load session from local storage
+  static Future<void> loadSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
+    currentUsername = prefs.getString(_usernameKey);
+    currentUserName = prefs.getString(_userNameKey);
+    userId = prefs.getString(_userIdKey);
+    authToken = prefs.getString(_authTokenKey);
+    siswaId = prefs.getString(_siswaIdKey);
+  }
+
+  // Clear session from local storage
+  static Future<void> _clearSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_isLoggedInKey);
+    await prefs.remove(_usernameKey);
+    await prefs.remove(_userNameKey);
+    await prefs.remove(_userIdKey);
+    await prefs.remove(_authTokenKey);
+    await prefs.remove(_siswaIdKey);
+  }
+
+  static void login(
+    String username, {
+    String? token,
+    String? userName,
+    String? id,
+    String? siswaIdValue,
+  }) {
+    isLoggedIn = true;
+    currentUsername = username;
+    currentUserName = userName;
+    userId = id;
+    authToken = token;
+    siswaId = siswaIdValue;
+    _saveSession(); // Save to local storage
+  }
+
+  static void logout() {
+    isLoggedIn = false;
+    currentUsername = null;
+    currentUserName = null;
+    userId = null;
+    authToken = null;
+    siswaId = null;
+    _clearSession(); // Clear from local storage
+  }
+}
+
+// Helper function to format date to Indonesian format
+String formatDateIndonesian(DateTime date) {
+  const List<String> monthsIndonesian = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+
+  return '${date.day} ${monthsIndonesian[date.month - 1]} ${date.year}';
+}
 
 void main() {
   runApp(const MyApp());
@@ -13,24 +189,13 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Skanida Student',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const MyHomePage(title: 'Skanida Student'),
+      home: const SplashScreen(),
+      routes: {
+        '/home': (context) => const MyHomePage(title: 'Skanida Student'),
+        '/login': (context) => const LoginPage(),
+      },
     );
   }
 }
@@ -54,17 +219,37 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  Widget _buildIconCard(IconData icon, String label, {VoidCallback? onTap}) {
+    final child = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 48, color: Theme.of(context).colorScheme.primary),
+        const SizedBox(height: 12),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.titleMedium,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+    if (onTap == null) {
+      return Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: child,
+      );
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: child,
+      ),
+    );
   }
 
   @override
@@ -80,42 +265,135 @@ class _MyHomePageState extends State<MyHomePage> {
         // TRY THIS: Try changing the color here to a specific color (to
         // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
         // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: Colors.deepPurple.shade900,
         // Here we take the value from the MyHomePage object that was created by
         // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text(widget.title, style: const TextStyle(color: Colors.white)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () {
+              SessionManager.logout();
+              Navigator.of(context).pushReplacementNamed('/login');
+            },
+          ),
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      body: Column(
+        children: [
+          // User Info Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.deepPurple.shade900,
+                  Colors.deepPurple.shade500,
+                  Colors.purple.shade400,
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello, ${SessionManager.currentUserName ?? 'User'}',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Hari ini: ${formatDateIndonesian(DateTime.now())}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          // Icons Grid
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              padding: const EdgeInsets.all(16),
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              children: [
+                _buildIconCard(
+                  Icons.account_circle,
+                  'Data Siswa',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SiswaDetailPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildIconCard(
+                  Icons.map,
+                  'Presensi',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PresensiPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildIconCard(
+                  Icons.mail,
+                  'Ijin Presensi',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const IjinOnlinePage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildIconCard(
+                  Icons.list,
+                  'Daftar Ijin',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const DaftarIjinPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildIconCard(
+                  Icons.exit_to_app,
+                  'Ijin Meninggalkan Kelas',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const KeluarKelasPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildIconCard(
+                  Icons.history,
+                  'Riwayat Izin',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const RiwayatIzinPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

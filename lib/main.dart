@@ -10,6 +10,8 @@ import 'ijin_online_page.dart';
 import 'daftar_ijin_page.dart';
 import 'keluar_kelas_page.dart';
 import 'riwayat_izin_page.dart';
+import 'presensi_sholat_page.dart';
+import 'ijin_sholat_page.dart';
 
 // API Configuration
 const String API_BASE_URL = 'https://apps.smkn2semarang.sch.id/api';
@@ -188,6 +190,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Skanida Student',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
@@ -386,6 +389,28 @@ class _MyHomePageState extends State<MyHomePage> {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (context) => const RiwayatIzinPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildIconCard(
+                  Icons.mosque,
+                  'Presensi Sholat',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PresensiSholatPage(),
+                      ),
+                    );
+                  },
+                ),
+                _buildIconCard(
+                  Icons.event_note,
+                  'Izin Sholat',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const IjinSholatPage(),
                       ),
                     );
                   },

@@ -210,7 +210,7 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
                               value: _selectedYear,
                               isExpanded: true,
                               items: List.generate(5, (index) {
-                                final year = DateTime.now().year - 2 + index;
+                                final year = DateTime.now().year - 4 + index;
                                 return DropdownMenuItem(
                                   value: year,
                                   child: Text(year.toString()),

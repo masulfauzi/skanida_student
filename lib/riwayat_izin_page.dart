@@ -28,7 +28,7 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
 
     try {
       final endpoint =
-          '$API_BASE_URL/riwayat-izin?siswa_id=${SessionManager.siswaId}';
+          '$API_BASE_URL/riwayat-izin?id_siswa=${SessionManager.siswaId}';
 
       final response = await http.get(
         Uri.parse(endpoint),
@@ -59,44 +59,60 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
   void _loadDummyData() {
     final dummyData = [
       {
-        'id': 2,
-        'tipe_izin': 'Keluar Kelas',
-        'jam_keluar': 3,
-        'jam_masuk': 4,
-        'guru_pengampu': 'Ibu Siti Nurhaliza',
+        'id': '1',
+        'id_siswa': SessionManager.siswaId,
+        'id_guru': '6d3e6e33-2169-43c0-ba81-91a6fb8d7e7c',
+        'id_jenis_ijin_keluar': '1',
         'keperluan': 'Minum air dan kamar kecil',
-        'status_izin': 'menunggu',
-        'created_at': '2026-02-03T09:15:00',
+        'tanggal': '2026-02-03',
+        'jam_keluar_pelajaran': '3',
+        'jam_kembali_pelajaran': '4',
+        'is_valid_guru': '0',
+        'is_valid_bk': '0',
+        'created_at': '2026-02-03T09:15:00.000000Z',
+        'updated_at': '2026-02-03T09:15:00.000000Z',
       },
       {
-        'id': 4,
-        'tipe_izin': 'Keluar Kelas',
-        'jam_keluar': 5,
-        'jam_masuk': 5,
-        'guru_pengampu': 'Bapak Ahmad Ridho',
+        'id': '2',
+        'id_siswa': SessionManager.siswaId,
+        'id_guru': 'bapak-ahmad-id',
+        'id_jenis_ijin_keluar': '1',
         'keperluan': 'Perlu izin khusus',
-        'status_izin': 'disetujui',
-        'created_at': '2026-02-02T11:30:00',
+        'tanggal': '2026-02-02',
+        'jam_keluar_pelajaran': '5',
+        'jam_kembali_pelajaran': '5',
+        'is_valid_guru': '1',
+        'is_valid_bk': '1',
+        'created_at': '2026-02-02T11:30:00.000000Z',
+        'updated_at': '2026-02-02T11:30:00.000000Z',
       },
       {
-        'id': 6,
-        'tipe_izin': 'Keluar Kelas',
-        'jam_keluar': 2,
-        'jam_masuk': 3,
-        'guru_pengampu': 'Ibu Dewi Lestari',
+        'id': '3',
+        'id_siswa': SessionManager.siswaId,
+        'id_guru': 'ibu-dewi-id',
+        'id_jenis_ijin_keluar': '1',
         'keperluan': 'Sakit kepala',
-        'status_izin': 'disetujui',
-        'created_at': '2026-02-01T08:00:00',
+        'tanggal': '2026-02-01',
+        'jam_keluar_pelajaran': '2',
+        'jam_kembali_pelajaran': '3',
+        'is_valid_guru': '1',
+        'is_valid_bk': '0',
+        'created_at': '2026-02-01T08:00:00.000000Z',
+        'updated_at': '2026-02-01T08:00:00.000000Z',
       },
       {
-        'id': 7,
-        'tipe_izin': 'Keluar Kelas',
-        'jam_keluar': 7,
-        'jam_masuk': 8,
-        'guru_pengampu': 'Bapak Bambang Suryanto',
+        'id': '4',
+        'id_siswa': SessionManager.siswaId,
+        'id_guru': 'bapak-bambang-id',
+        'id_jenis_ijin_keluar': '1',
         'keperluan': 'Mengurus administrasi',
-        'status_izin': 'ditolak',
-        'created_at': '2026-01-31T10:30:00',
+        'tanggal': '2026-01-31',
+        'jam_keluar_pelajaran': '7',
+        'jam_kembali_pelajaran': '8',
+        'is_valid_guru': '0',
+        'is_valid_bk': '0',
+        'created_at': '2026-01-31T10:30:00.000000Z',
+        'updated_at': '2026-01-31T10:30:00.000000Z',
       },
     ];
 
@@ -130,40 +146,31 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
     }
   }
 
-  // Get status color
-  Color _getStatusColor(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'disetujui':
-      case 'approved':
-        return Colors.green;
-      case 'ditolak':
-      case 'rejected':
-        return Colors.red;
-      case 'menunggu':
-      case 'pending':
-        return Colors.orange;
-      default:
-        return Colors.grey;
+  // Get status color based on validation flags
+  Color _getStatusColor(Map<String, dynamic> izin) {
+    final isValidGuru = izin['is_valid_guru'].toString() == '1';
+    final isValidBk = izin['is_valid_bk'].toString() == '1';
+    
+    if (isValidGuru && isValidBk) {
+      return Colors.green;
+    } else if (!isValidGuru || !isValidBk) {
+      return Colors.orange;
+    } else {
+      return Colors.grey;
     }
   }
 
-  // Get status text
-  String _getStatusText(String? status) {
-    switch (status?.toLowerCase()) {
-      case 'disetujui':
-        return 'Disetujui';
-      case 'ditolak':
-        return 'Ditolak';
-      case 'menunggu':
-        return 'Menunggu';
-      case 'approved':
-        return 'Disetujui';
-      case 'rejected':
-        return 'Ditolak';
-      case 'pending':
-        return 'Menunggu';
-      default:
-        return status ?? 'Tidak diketahui';
+  // Get status text based on validation flags
+  String _getStatusText(Map<String, dynamic> izin) {
+    final isValidGuru = izin['is_valid_guru'].toString() == '1';
+    final isValidBk = izin['is_valid_bk'].toString() == '1';
+    
+    if (isValidGuru && isValidBk) {
+      return 'Disetujui';
+    } else if (isValidGuru && !isValidBk) {
+      return 'Menunggu BK';
+    } else {
+      return 'Menunggu Guru';
     }
   }
 
@@ -223,14 +230,25 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
                           onRefresh: _loadRiwayatIzin,
                           child: ListView.builder(
                             padding: const EdgeInsets.all(16),
-                            itemCount: _izinList.where((item) => (item['tipe_izin'] ?? '').toString().toLowerCase().contains('keluar')).length,
+                            itemCount: _izinList
+                                .where(
+                                  (item) =>
+                                      (item['id_jenis_ijin_keluar'] ?? '')
+                                          .toString()
+                                          .isNotEmpty,
+                                )
+                                .length,
                             itemBuilder: (context, index) {
-                              final filteredList = _izinList.where((item) => (item['tipe_izin'] ?? '').toString().toLowerCase().contains('keluar')).toList();
+                              final filteredList = _izinList
+                                  .where(
+                                    (item) =>
+                                        (item['id_jenis_ijin_keluar'] ?? '')
+                                            .toString()
+                                            .isNotEmpty,
+                                  )
+                                  .toList();
                               final izin = filteredList[index];
-                              final tipe =
-                                  izin['tipe_izin'] ??
-                                  izin['jenis_izin'] ??
-                                  'Tidak diketahui';
+                              const tipe = 'Keluar Kelas';
 
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 16),
@@ -283,25 +301,18 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
                                               vertical: 6,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: _getStatusColor(
-                                                izin['status_izin'],
-                                              ).withOpacity(0.1),
+                                              color: _getStatusColor(izin)
+                                                  .withOpacity(0.1),
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                               border: Border.all(
-                                                color: _getStatusColor(
-                                                  izin['status_izin'],
-                                                ),
+                                                color: _getStatusColor(izin),
                                               ),
                                             ),
                                             child: Text(
-                                              _getStatusText(
-                                                izin['status_izin'],
-                                              ),
+                                              _getStatusText(izin),
                                               style: TextStyle(
-                                                color: _getStatusColor(
-                                                  izin['status_izin'],
-                                                ),
+                                                color: _getStatusColor(izin),
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 12,
                                               ),
@@ -310,32 +321,8 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
                                         ],
                                       ),
                                       const SizedBox(height: 12),
-                                      // Date range for ijin presensi
-                                      if (izin['start_date'] != null &&
-                                          izin['end_date'] != null) ...[
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.calendar_today,
-                                              size: 16,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                '${_formatDate(izin['start_date'])} - ${_formatDate(izin['end_date'])} (${izin['lama_ijin'] ?? '-'} hari)',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                      ],
                                       // Lesson info for keluar kelas
-                                      if (izin['jam_keluar'] != null &&
-                                          izin['jam_masuk'] != null) ...[
+                                      if (izin['jam_keluar_pelajaran'] != null) ...[
                                         Row(
                                           children: [
                                             Icon(
@@ -346,7 +333,7 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                'Jam ke-${izin['jam_keluar']} s/d Jam ke-${izin['jam_masuk']}',
+                                                'Jam ke-${izin['jam_keluar_pelajaran']}${izin['jam_kembali_pelajaran'] != null ? ' s/d Jam ke-${izin['jam_kembali_pelajaran']}' : ''}',
                                                 style: TextStyle(
                                                   color: Colors.grey.shade700,
                                                 ),
@@ -356,8 +343,8 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
                                         ),
                                         const SizedBox(height: 8),
                                       ],
-                                      // Teacher info for keluar kelas
-                                      if (izin['guru_pengampu'] != null) ...[
+                                      // Guru Name
+                                      if (izin['nama'] != null) ...[
                                         Row(
                                           children: [
                                             Icon(
@@ -368,10 +355,12 @@ class _RiwayatIzinPageState extends State<RiwayatIzinPage> {
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
-                                                'Guru: ${izin['guru_pengampu']}',
+                                                'Guru: ${izin['nama']}',
                                                 style: TextStyle(
                                                   color: Colors.grey.shade700,
                                                 ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],

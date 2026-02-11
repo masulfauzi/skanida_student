@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
@@ -14,9 +14,9 @@ class SelfieCameraPage extends StatefulWidget {
 }
 
 class _SelfieCameraPageState extends State<SelfieCameraPage> {
-  CameraController? _cameraController;
-  bool _isInitialized = false;
-  bool _isTakingPicture = false;
+  final ImagePicker _picker = ImagePicker();
+  File? _capturedImage;
+  bool _isUploading = false;
 
   // Format datetime to Indonesian format (UTC+7)
   String _formatDateTimeIndonesian(String dateTimeString) {
@@ -57,72 +57,42 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      final cameras = await availableCameras();
-
-      // Find front camera for selfie
-      final frontCamera = cameras.firstWhere(
-        (camera) => camera.lensDirection == CameraLensDirection.front,
-        orElse: () => cameras.first,
-      );
-
-      _cameraController = CameraController(
-        frontCamera,
-        ResolutionPreset.high,
-        enableAudio: false,
-      );
-
-      await _cameraController!.initialize();
-
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error initializing camera: ${e.toString()}')),
-        );
-      }
-    }
-  }
-
-  Future<void> _takePicture() async {
-    if (_cameraController == null ||
-        !_cameraController!.value.isInitialized ||
-        _isTakingPicture) {
-      return;
-    }
-
-    setState(() {
-      _isTakingPicture = true;
+    // Automatically open the camera when the page loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _takeSelfie();
     });
+  }
 
+  Future<void> _takeSelfie() async {
     try {
-      final image = await _cameraController!.takePicture();
+      final XFile? photo = await _picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 85,
+      );
 
-      if (mounted) {
-        // Upload the image to the API
-        await _uploadImage(image.path);
+      if (photo != null && mounted) {
+        setState(() {
+          _capturedImage = File(photo.path);
+        });
+      } else if (mounted && _capturedImage == null) {
+        // User cancelled without taking a photo, go back
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isTakingPicture = false;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error taking picture: ${e.toString()}')),
+          SnackBar(content: Text('Error opening camera: ${e.toString()}')),
         );
+        Navigator.of(context).pop();
       }
     }
   }
 
   Future<void> _uploadImage(String imagePath) async {
+    setState(() {
+      _isUploading = true;
+    });
     try {
       // Get siswaId from SessionManager and authToken from SharedPreferences
       final siswaId = SessionManager.siswaId;
@@ -132,7 +102,7 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
       if (siswaId == null) {
         if (mounted) {
           setState(() {
-            _isTakingPicture = false;
+            _isUploading = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -146,7 +116,7 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
       if (authToken == null) {
         if (mounted) {
           setState(() {
-            _isTakingPicture = false;
+            _isUploading = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -184,7 +154,7 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
 
       if (mounted) {
         setState(() {
-          _isTakingPicture = false;
+          _isUploading = false;
         });
 
         if (response.statusCode == 200 || response.statusCode == 201) {
@@ -228,7 +198,7 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _isTakingPicture = false;
+          _isUploading = false;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -321,7 +291,6 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
 
   @override
   void dispose() {
-    _cameraController?.dispose();
     super.dispose();
   }
 
@@ -340,43 +309,75 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: _isInitialized
+      body: _capturedImage != null
           ? Stack(
               children: [
-                // Camera preview
-                Center(child: CameraPreview(_cameraController!)),
-                // Capture button at the bottom
+                // Image preview
+                Center(
+                  child: Image.file(
+                    _capturedImage!,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                // Bottom buttons: Retake and Upload
                 Positioned(
                   bottom: 40,
                   left: 0,
                   right: 0,
-                  child: Center(
-                    child: GestureDetector(
-                      onTap: _isTakingPicture ? null : _takePicture,
-                      child: Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white,
-                          border: Border.all(
-                            color: Colors.deepPurple.shade900,
-                            width: 4,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Retake button
+                      GestureDetector(
+                        onTap: _isUploading ? null : _takeSelfie,
+                        child: Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(
+                              color: Colors.grey.shade600,
+                              width: 3,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.refresh,
+                            size: 30,
+                            color: Colors.grey.shade600,
                           ),
                         ),
-                        child: _isTakingPicture
-                            ? const Center(
-                                child: CircularProgressIndicator(
-                                  color: Colors.deepPurple,
-                                ),
-                              )
-                            : Icon(
-                                Icons.camera_alt,
-                                size: 35,
-                                color: Colors.deepPurple.shade900,
-                              ),
                       ),
-                    ),
+                      // Upload button
+                      GestureDetector(
+                        onTap: _isUploading
+                            ? null
+                            : () => _uploadImage(_capturedImage!.path),
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(
+                              color: Colors.deepPurple.shade900,
+                              width: 4,
+                            ),
+                          ),
+                          child: _isUploading
+                              ? const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.deepPurple,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.check,
+                                  size: 35,
+                                  color: Colors.deepPurple.shade900,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

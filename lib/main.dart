@@ -222,6 +222,59 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  @override
+  void initState() {
+    super.initState();
+    _fetchPesanHarian();
+  }
+
+  void _showPesanHarianDialog(String pesan) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.campaign, color: Colors.amber.shade800, size: 28),
+            const SizedBox(width: 10),
+            const Text('Pesan Hari Ini'),
+          ],
+        ),
+        content: Text(pesan, style: const TextStyle(fontSize: 15)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _fetchPesanHarian() async {
+    try {
+      final headers = {
+        'Accept': 'application/json',
+        if (SessionManager.authToken != null)
+          'Authorization': 'Bearer ${SessionManager.authToken}',
+      };
+      final response = await http
+          .get(Uri.parse('$API_BASE_URL/pesan-harian'), headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        final pesan =
+            json['pesan'] ?? json['message'] ?? json['data']?.toString();
+        if (pesan != null && pesan.toString().isNotEmpty && mounted) {
+          _showPesanHarianDialog(pesan.toString());
+        }
+      }
+    } catch (e) {
+      // silently ignore
+    }
+  }
+
   Widget _buildIconCard(IconData icon, String label, {VoidCallback? onTap}) {
     final child = Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -351,7 +404,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 _buildIconCard(
                   Icons.mail,
-                  'Ijin Presensi',
+                  'Izin Presensi',
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -362,7 +415,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 _buildIconCard(
                   Icons.list,
-                  'Daftar Ijin',
+                  'Daftar Izin',
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -373,7 +426,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 _buildIconCard(
                   Icons.exit_to_app,
-                  'Ijin Meninggalkan Kelas',
+                  'Izin Meninggalkan Kelas',
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(

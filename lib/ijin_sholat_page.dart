@@ -104,10 +104,7 @@ class _IjinSholatPageState extends State<IjinSholatPage> {
           // If response body is not JSON, just use default message
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -188,7 +185,7 @@ class _IjinSholatPageState extends State<IjinSholatPage> {
 
               // Alasan Ijin dropdown
               Text(
-                'Alasan Ijin',
+                'Alasan Izin',
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -210,11 +207,11 @@ class _IjinSholatPageState extends State<IjinSholatPage> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  hintText: 'Pilih alasan ijin',
+                  hintText: 'Pilih alasan izin',
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Alasan ijin harus dipilih';
+                    return 'Alasan izin harus dipilih';
                   }
                   return null;
                 },

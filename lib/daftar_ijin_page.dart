@@ -124,7 +124,7 @@ class _DaftarIjinPageState extends State<DaftarIjinPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.deepPurple.shade900,
-        title: const Text('Daftar Ijin', style: TextStyle(color: Colors.white)),
+        title: const Text('Daftar Izin', style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _isLoading

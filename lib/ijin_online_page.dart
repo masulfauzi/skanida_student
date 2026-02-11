@@ -334,7 +334,7 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Form Pengajuan Ijin',
+                        'Form Pengajuan Izin',
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
                               fontWeight: FontWeight.bold,
@@ -348,7 +348,7 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
 
                 // Dropdown for Type
                 Text(
-                  'Jenis Ijin',
+                  'Jenis Izin',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -364,7 +364,7 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
                       horizontal: 16,
                       vertical: 12,
                     ),
-                    hintText: 'Pilih jenis ijin',
+                    hintText: 'Pilih jenis izin',
                   ),
                   items: _typeOptions.map((String type) {
                     return DropdownMenuItem<String>(
@@ -518,7 +518,7 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
                 ElevatedButton.icon(
                   onPressed: _showFileOptions,
                   icon: const Icon(Icons.add_photo_alternate),
-                  label: const Text('Upload Surat'),
+                  label: const Text('Pilih Surat'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurple.shade900,
                     foregroundColor: Colors.white,
@@ -578,7 +578,7 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
                             ),
                           )
                         : const Text(
-                            'Submit',
+                            'Kirim Pengajuan',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

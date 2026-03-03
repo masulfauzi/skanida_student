@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'main.dart'; // To access AuthService and SessionManager
 
 class LoginPage extends StatefulWidget {
@@ -79,25 +80,10 @@ class _LoginPageState extends State<LoginPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // Logo
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.9),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.flutter_dash,
-                    size: 60,
-                    color: Colors.deepPurple.shade900,
-                  ),
+                Image.asset(
+                  'assets/images/skanida.png',
+                  width: 150,
+                  height: 150,
                 ),
                 const SizedBox(height: 30),
                 // Title
@@ -151,7 +137,9 @@ class _LoginPageState extends State<LoginPage> {
                     prefixIcon: Icon(Icons.lock, color: Colors.white70),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                        _isPasswordVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                         color: Colors.white70,
                       ),
                       onPressed: () {
@@ -227,6 +215,32 @@ class _LoginPageState extends State<LoginPage> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Forgot Password
+                GestureDetector(
+                  onTap: () {
+                    launchUrl(
+                      Uri.parse('https://apps.smkn2semarang.sch.id/forgot-password'),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  child: RichText(
+                    text: const TextSpan(
+                      text: 'Lupa password? ',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                      children: [
+                        TextSpan(
+                          text: 'Klik disini',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

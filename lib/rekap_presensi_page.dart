@@ -14,7 +14,11 @@ class Presensi {
     return Presensi(
       tanggal: json['tgl']?.toString() ?? 'Data tidak valid',
       waktuPresensi: json['created_at'] != null
-          ? DateTime.parse(json['created_at'].toString()).add(const Duration(hours: 7)).toString().split(' ')[1].substring(0, 8)
+          ? DateTime.parse(json['created_at'].toString())
+                .add(const Duration(hours: 7))
+                .toString()
+                .split(' ')[1]
+                .substring(0, 8)
           : null,
       status: json['status']?.toString() ?? 'Data tidak valid',
     );
@@ -51,7 +55,9 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
 
     final int targetMonth = month ?? _selectedMonth;
     final int targetYear = year ?? _selectedYear;
-    final Uri uri = Uri.parse('$API_BASE_URL/presensi/$siswaId/$targetMonth/$targetYear');
+    final Uri uri = Uri.parse(
+      '$API_BASE_URL/presensi/$siswaId/$targetMonth/$targetYear',
+    );
 
     try {
       final response = await http.get(
@@ -78,14 +84,27 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
 
   void _updateFilter() {
     setState(() {
-      _futurePresensi = _fetchPresensiData(month: _selectedMonth, year: _selectedYear);
+      _futurePresensi = _fetchPresensiData(
+        month: _selectedMonth,
+        year: _selectedYear,
+      );
     });
   }
 
   String _getMonthName(int month) {
     const monthNames = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
     ];
     return monthNames[month - 1];
   }
@@ -147,7 +166,10 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.deepPurple.shade900,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -173,7 +195,10 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
                           decoration: const InputDecoration(
                             labelText: 'Bulan',
                             border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<int>(
@@ -203,7 +228,10 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
                           decoration: const InputDecoration(
                             labelText: 'Tahun',
                             border: OutlineInputBorder(),
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<int>(
@@ -245,6 +273,7 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.all(16.0),
                   child: DataTable(
+                    columnSpacing: 20,
                     border: TableBorder.all(
                       color: Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(8),
@@ -260,10 +289,13 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
                         ),
                       ),
                       DataColumn(
-                        label: Text(
-                          'Waktu\nPresensi',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
+                        label: SizedBox(
+                          width: 80,
+                          child: Text(
+                            'Waktu\nPresensi',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                       DataColumn(
@@ -279,14 +311,17 @@ class _RekapPresensiPageState extends State<RekapPresensiPage> {
                           DataCell(Text(presensi.tanggal)),
                           DataCell(Text(presensi.waktuPresensi ?? '-')),
                           DataCell(
-                            Text(
-                              presensi.status,
-                              style: TextStyle(
-                                color: presensi.status == 'Hadir'
-                                    ? Colors.green.shade700
-                                    : (presensi.status == 'Absen'
-                                          ? Colors.red.shade700
-                                          : Colors.orange.shade700),
+                            Center(
+                              child: Text(
+                                presensi.status,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: presensi.status == 'Hadir'
+                                      ? Colors.green.shade700
+                                      : (presensi.status == 'Tidak Hadir'
+                                            ? Colors.red.shade700
+                                            : Colors.orange.shade700),
+                                ),
                               ),
                             ),
                           ),

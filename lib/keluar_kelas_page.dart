@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:developer';
 import 'main.dart';
+import 'ads_helper.dart';
 
 class KeluarKelasPage extends StatefulWidget {
   const KeluarKelasPage({super.key});
@@ -33,6 +34,15 @@ class _KeluarKelasPageState extends State<KeluarKelasPage> {
     super.initState();
     _loadTeachers();
     _loadJenisIzin();
+    // Load interstitial ad when page initializes
+    AdsHelper.loadInterstitialAd();
+  }
+
+  @override
+  void dispose() {
+    // Clean up ads
+    AdsHelper.dispose();
+    super.dispose();
   }
 
   // Load jenis izin from API
@@ -177,9 +187,13 @@ class _KeluarKelasPageState extends State<KeluarKelasPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to home
+              // Show interstitial ad before navigating back
+              await AdsHelper.showInterstitialAd();
+              if (mounted) {
+                Navigator.pop(context); // Go back to home
+              }
             },
             child: const Text('OK'),
           ),

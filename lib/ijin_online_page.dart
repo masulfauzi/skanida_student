@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'main.dart';
+import 'ads_helper.dart';
 
 class IjinOnlinePage extends StatefulWidget {
   const IjinOnlinePage({super.key});
@@ -38,6 +39,20 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
     'November',
     'Desember',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load interstitial ad when page initializes
+    AdsHelper.loadInterstitialAd();
+  }
+
+  @override
+  void dispose() {
+    // Clean up ads
+    AdsHelper.dispose();
+    super.dispose();
+  }
 
   // Format date to Indonesian format
   String _formatDate(DateTime date) {
@@ -283,7 +298,11 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Ijin berhasil diajukan')),
           );
-          Navigator.of(context).pop();
+          // Show interstitial ad before navigating back (non-blocking)
+          await AdsHelper.showInterstitialAd();
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
         }
       } else {
         if (mounted) {

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'dart:convert';
 import 'main.dart'; // To access SessionManager and API constants
+import 'permission_guard.dart';
 
 class SiswaService {
   static Future<Map<String, dynamic>> getSiswaData() async {
@@ -68,6 +69,14 @@ class _SiswaDetailPageState extends State<SiswaDetailPage> {
   }
 
   Future<void> _pickAndUploadPhoto() async {
+    final granted = await PermissionGuard.ensurePermission(
+      context,
+      RequiredPermission.file,
+    );
+    if (!granted) {
+      return;
+    }
+
     final picker = ImagePicker();
     final picked = await picker.pickImage(
       source: ImageSource.gallery,

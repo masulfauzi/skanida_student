@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'main.dart'; // To access SessionManager and other widgets
 import 'login_page.dart';
-import 'permission_pre_alert_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,10 +14,22 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigateToHome();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initTrackingThenNavigate();
+    });
   }
 
-  _navigateToHome() async {
+  Future<void> _initTrackingThenNavigate() async {
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e) {
+      debugPrint('MobileAds init error: $e');
+    }
+
+    await _navigateToHome();
+  }
+
+  Future<void> _navigateToHome() async {
     // Load saved session first
     await SessionManager.loadSession();
     await Future.delayed(const Duration(seconds: 2), () {});
@@ -26,20 +37,6 @@ class _SplashScreenState extends State<SplashScreen> {
       final destination = SessionManager.isLoggedIn
           ? const MyHomePage(title: 'Skanida Student')
           : const LoginPage();
-      final prefs = await SharedPreferences.getInstance();
-      final isPermissionPreAlertSeen =
-          prefs.getBool(permissionPreAlertSeenKey) ?? false;
-
-      if (!isPermissionPreAlertSeen) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (BuildContext context) =>
-                PermissionPreAlertPage(nextPage: destination),
-          ),
-        );
-        return;
-      }
-
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (BuildContext context) => destination),
       );

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'main.dart';
 import 'ads_helper.dart';
+import 'permission_guard.dart';
 
 class IjinOnlinePage extends StatefulWidget {
   const IjinOnlinePage({super.key});
@@ -121,6 +122,14 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
 
   // Pick file from device
   Future<void> _pickFile() async {
+    final granted = await PermissionGuard.ensurePermission(
+      context,
+      RequiredPermission.file,
+    );
+    if (!granted) {
+      return;
+    }
+
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -144,6 +153,14 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
 
   // Capture image using camera
   Future<void> _captureImage() async {
+    final granted = await PermissionGuard.ensurePermission(
+      context,
+      RequiredPermission.camera,
+    );
+    if (!granted) {
+      return;
+    }
+
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? photo = await picker.pickImage(
@@ -291,7 +308,6 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
 
       // Send request
       var response = await request.send();
-      final responseBody = await response.stream.bytesToString();
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {

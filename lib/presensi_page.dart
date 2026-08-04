@@ -28,13 +28,24 @@ class _PresensiPageState extends State<PresensiPage> {
 
   Future<void> _getCurrentLocation() async {
     try {
+      if (mounted) {
+        setState(() {
+          _isLoadingLocation = true;
+        });
+      }
+
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Layanan lokasi dinonaktifkan')),
+          const SnackBar(
+            content: Text(
+              'Layanan lokasi dimatikan. Presensi lokasi tidak tersedia.',
+            ),
+          ),
         );
         setState(() {
           _isLoadingLocation = false;
+          _currentLocation = null;
         });
         return;
       }
@@ -48,9 +59,25 @@ class _PresensiPageState extends State<PresensiPage> {
           ).showSnackBar(const SnackBar(content: Text('Izin lokasi ditolak')));
           setState(() {
             _isLoadingLocation = false;
+            _currentLocation = null;
           });
           return;
         }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Izin lokasi ditolak permanen. Presensi lokasi tidak tersedia.',
+            ),
+          ),
+        );
+        setState(() {
+          _isLoadingLocation = false;
+          _currentLocation = null;
+        });
+        return;
       }
 
       Position position = await Geolocator.getCurrentPosition(
@@ -67,6 +94,7 @@ class _PresensiPageState extends State<PresensiPage> {
       ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       setState(() {
         _isLoadingLocation = false;
+        _currentLocation = null;
       });
     }
   }
@@ -85,6 +113,11 @@ class _PresensiPageState extends State<PresensiPage> {
 
   @override
   Widget build(BuildContext context) {
+    final distanceToSchool = _currentLocation == null
+        ? null
+        : _calculateDistance(_currentLocation!, schoolLocation);
+    final withinRange = distanceToSchool != null && distanceToSchool <= 25;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.deepPurple.shade900,
@@ -137,12 +170,7 @@ class _PresensiPageState extends State<PresensiPage> {
                                   color: Colors.deepPurple.shade900,
                                 ),
                           ),
-                          if (_currentLocation != null &&
-                              _calculateDistance(
-                                    _currentLocation!,
-                                    schoolLocation,
-                                  ) >
-                                  25)
+                          if (distanceToSchool != null && !withinRange)
                             Padding(
                               padding: const EdgeInsets.only(top: 4),
                               child: Text(
@@ -157,32 +185,93 @@ class _PresensiPageState extends State<PresensiPage> {
                         ],
                       ),
                     ),
-                    if (_currentLocation != null &&
-                        _calculateDistance(_currentLocation!, schoolLocation) <=
-                            25)
-                      IconButton(
-                        icon: Icon(
-                          Icons.fingerprint,
-                          size: 32,
-                          color: Colors.deepPurple.shade900,
-                        ),
-                        onPressed: () async {
-                          final imagePath = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const SelfieCameraPage(),
-                            ),
-                          );
-                          if (imagePath != null && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Presensi Berhasil Dilakukan'),
-                              ),
-                            );
-                          }
-                        },
+                    IconButton(
+                      icon: Icon(
+                        Icons.fingerprint,
+                        size: 32,
+                        color: withinRange
+                            ? Colors.deepPurple.shade900
+                            : Colors.grey.shade500,
                       ),
+                      tooltip: withinRange
+                          ? 'Mulai presensi'
+                          : 'Aktifkan lokasi dan pastikan berada di area sekolah',
+                      onPressed: withinRange
+                          ? () async {
+                              final imagePath = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const SelfieCameraPage(),
+                                ),
+                              );
+                              if (imagePath != null && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Presensi Berhasil Dilakukan',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          : null,
+                    ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.deepPurple.shade100),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _isLoadingLocation
+                              ? Colors.orange.shade600
+                              : distanceToSchool == null
+                              ? Colors.grey.shade500
+                              : withinRange
+                              ? Colors.green.shade600
+                              : Colors.red.shade600,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _isLoadingLocation
+                              ? 'Memeriksa lokasi...'
+                              : distanceToSchool == null
+                              ? 'Lokasi belum tersedia'
+                              : withinRange
+                              ? 'Dalam jangkauan presensi'
+                              : 'Di luar jangkauan presensi',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Colors.deepPurple.shade900,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                      if (distanceToSchool != null)
+                        Text(
+                          '${distanceToSchool.toStringAsFixed(0)} m',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Colors.deepPurple.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -193,9 +282,30 @@ class _PresensiPageState extends State<PresensiPage> {
                 ? const Center(child: CircularProgressIndicator())
                 : _currentLocation == null
                 ? Center(
-                    child: Text(
-                      'Lokasi tidak tersedia',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.location_off,
+                            size: 48,
+                            color: Colors.grey.shade500,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Lokasi tidak tersedia. Aktifkan izin lokasi untuk presensi.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: _getCurrentLocation,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Coba Lagi'),
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 : FlutterMap(

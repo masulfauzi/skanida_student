@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'siswa_detail_page.dart';
 import 'login_page.dart';
 import 'splash_screen.dart';
@@ -182,12 +180,6 @@ String formatDateIndonesian(DateTime date) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize Google Mobile Ads
-  try {
-    await MobileAds.instance.initialize();
-  } catch (e) {
-    print('Error initializing Mobile Ads: $e');
-  }
   runApp(const MyApp());
 }
 

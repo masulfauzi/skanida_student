@@ -4,12 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'permission_types.dart';
+
 const String permissionPreAlertSeenKey = 'permission_pre_alert_seen';
 
 class PermissionPreAlertPage extends StatefulWidget {
-  const PermissionPreAlertPage({super.key, required this.nextPage});
+  const PermissionPreAlertPage({
+    super.key,
+    this.nextPage,
+    this.forceGrantAll = false,
+    this.requiredPermissions,
+  });
 
-  final Widget nextPage;
+  final Widget? nextPage;
+  final bool forceGrantAll;
+  final Set<RequiredPermission>? requiredPermissions;
 
   @override
   State<PermissionPreAlertPage> createState() => _PermissionPreAlertPageState();
@@ -21,6 +30,33 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
   PermissionStatus _locationStatus = PermissionStatus.denied;
 
   bool _isRequestingAll = false;
+
+  Set<RequiredPermission> get _requiredPermissions {
+    return widget.requiredPermissions ??
+        {
+          RequiredPermission.camera,
+          RequiredPermission.file,
+          RequiredPermission.location,
+        };
+  }
+
+  bool get _needsCamera =>
+      _requiredPermissions.contains(RequiredPermission.camera);
+  bool get _needsFile => _requiredPermissions.contains(RequiredPermission.file);
+  bool get _needsLocation =>
+      _requiredPermissions.contains(RequiredPermission.location);
+
+  bool get _allPermissionsGranted {
+    if (_requiredPermissions.isEmpty) {
+      return true;
+    }
+
+    final cameraOk = !_needsCamera || _isAllowed(_cameraStatus);
+    final fileOk = !_needsFile || _isAllowed(_fileStatus);
+    final locationOk = !_needsLocation || _isAllowed(_locationStatus);
+
+    return cameraOk && fileOk && locationOk;
+  }
 
   @override
   void initState() {
@@ -34,9 +70,15 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
   }
 
   Future<void> _loadPermissionStatuses() async {
-    final camera = await Permission.camera.status;
-    final file = await _currentFilePermissionStatus();
-    final location = await Permission.locationWhenInUse.status;
+    final camera = _needsCamera
+        ? await Permission.camera.status
+        : _cameraStatus;
+    final file = _needsFile
+        ? await _currentFilePermissionStatus()
+        : _fileStatus;
+    final location = _needsLocation
+        ? await Permission.locationWhenInUse.status
+        : _locationStatus;
 
     if (!mounted) {
       return;
@@ -64,8 +106,7 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
 
   Future<void> _requestCameraPermission() async {
     if (_cameraStatus == PermissionStatus.permanentlyDenied) {
-      await openAppSettings();
-      await _loadPermissionStatuses();
+      await _showSettingsDialog('Kamera');
       return;
     }
 
@@ -77,12 +118,15 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     setState(() {
       _cameraStatus = status;
     });
+
+    if (status == PermissionStatus.permanentlyDenied) {
+      await _showSettingsDialog('Kamera');
+    }
   }
 
   Future<void> _requestFilePermission() async {
     if (_fileStatus == PermissionStatus.permanentlyDenied) {
-      await openAppSettings();
-      await _loadPermissionStatuses();
+      await _showSettingsDialog('File/Media');
       return;
     }
 
@@ -107,12 +151,15 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     setState(() {
       _fileStatus = status;
     });
+
+    if (status == PermissionStatus.permanentlyDenied) {
+      await _showSettingsDialog('File/Media');
+    }
   }
 
   Future<void> _requestLocationPermission() async {
     if (_locationStatus == PermissionStatus.permanentlyDenied) {
-      await openAppSettings();
-      await _loadPermissionStatuses();
+      await _showSettingsDialog('Lokasi');
       return;
     }
 
@@ -124,6 +171,10 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     setState(() {
       _locationStatus = status;
     });
+
+    if (status == PermissionStatus.permanentlyDenied) {
+      await _showSettingsDialog('Lokasi');
+    }
   }
 
   Future<void> _requestAllPermissions() async {
@@ -131,18 +182,32 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
       _isRequestingAll = true;
     });
 
-    await _requestCameraPermission();
-    await _requestFilePermission();
-    await _requestLocationPermission();
+    if (_needsCamera) {
+      await _requestCameraPermission();
+    }
+    if (_needsFile) {
+      await _requestFilePermission();
+    }
+    if (_needsLocation) {
+      await _requestLocationPermission();
+    }
 
-    if (_cameraStatus == PermissionStatus.permanentlyDenied ||
-        _fileStatus == PermissionStatus.permanentlyDenied ||
-        _locationStatus == PermissionStatus.permanentlyDenied) {
+    final hasPermanentDeny =
+        (_needsCamera && _cameraStatus == PermissionStatus.permanentlyDenied) ||
+        (_needsFile && _fileStatus == PermissionStatus.permanentlyDenied) ||
+        (_needsLocation &&
+            _locationStatus == PermissionStatus.permanentlyDenied);
+
+    if (hasPermanentDeny) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Sebagian izin ditolak permanen. Aktifkan manual di Settings.',
+          SnackBar(
+            content: const Text(
+              'Sebagian izin ditolak permanen. Anda dapat mengaktifkannya di Settings.',
+            ),
+            action: SnackBarAction(
+              label: 'Buka Settings',
+              onPressed: () => openAppSettings(),
             ),
           ),
         );
@@ -156,9 +221,24 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     setState(() {
       _isRequestingAll = false;
     });
+
+    await _continueToApp();
   }
 
   Future<void> _continueToApp() async {
+    if (widget.forceGrantAll && !_allPermissionsGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Izin belum diberikan. Anda dapat melanjutkan tanpa izin, tetapi fitur terkait tidak bisa digunakan.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(permissionPreAlertSeenKey, true);
 
@@ -166,9 +246,14 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
       return;
     }
 
-    Navigator.of(
-      context,
-    ).pushReplacement(MaterialPageRoute(builder: (_) => widget.nextPage));
+    if (widget.nextPage != null) {
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => widget.nextPage!));
+      return;
+    }
+
+    Navigator.of(context).pop(_allPermissionsGranted);
   }
 
   String _statusLabel(PermissionStatus status) {
@@ -181,7 +266,7 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     if (status == PermissionStatus.restricted) {
       return 'Dibatasi sistem';
     }
-    return 'Belum diizinkan';
+    return 'Belum diberi izin';
   }
 
   Color _statusColor(PermissionStatus status) {
@@ -193,7 +278,6 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     required String title,
     required String description,
     required PermissionStatus status,
-    required VoidCallback onRequest,
   }) {
     return Card(
       elevation: 1,
@@ -216,7 +300,6 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
                     ),
                   ),
                 ),
-                TextButton(onPressed: onRequest, child: const Text('Izinkan')),
               ],
             ),
             const SizedBox(height: 4),
@@ -237,71 +320,120 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Izin Aplikasi'),
-        backgroundColor: Colors.deepPurple.shade900,
-        foregroundColor: Colors.white,
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Sebelum mulai, aktifkan izin penting berikut agar fitur aplikasi dapat berjalan dengan baik.',
-                style: TextStyle(color: Colors.grey.shade800, fontSize: 15),
-              ),
-              const SizedBox(height: 14),
-              _buildPermissionTile(
-                icon: Icons.camera_alt,
-                title: 'Kamera',
-                description:
-                    'Digunakan untuk selfie presensi dan unggah bukti.',
-                status: _cameraStatus,
-                onRequest: _requestCameraPermission,
-              ),
-              _buildPermissionTile(
-                icon: Icons.folder,
-                title: 'File / Media',
-                description: 'Digunakan untuk memilih berkas pendukung izin.',
-                status: _fileStatus,
-                onRequest: _requestFilePermission,
-              ),
-              _buildPermissionTile(
-                icon: Icons.location_on,
-                title: 'Lokasi',
-                description: 'Digunakan untuk validasi posisi saat presensi.',
-                status: _locationStatus,
-                onRequest: _requestLocationPermission,
-              ),
-              const Spacer(),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isRequestingAll ? null : _requestAllPermissions,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.deepPurple.shade700,
-                    foregroundColor: Colors.white,
+    const requestAllLabel = 'Lanjutkan';
+
+    final introText = _buildIntroText();
+
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Izin Aplikasi'),
+          backgroundColor: Colors.deepPurple.shade900,
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  introText,
+                  style: TextStyle(color: Colors.grey.shade800, fontSize: 15),
+                ),
+                const SizedBox(height: 14),
+                if (_needsCamera)
+                  _buildPermissionTile(
+                    icon: Icons.camera_alt,
+                    title: 'Kamera',
+                    description:
+                        'Digunakan untuk selfie presensi dan unggah bukti.',
+                    status: _cameraStatus,
                   ),
-                  child: Text(
-                    _isRequestingAll ? 'Meminta izin...' : 'Izinkan Semua',
+                if (_needsFile)
+                  _buildPermissionTile(
+                    icon: Icons.folder,
+                    title: 'File / Media',
+                    description:
+                        'Digunakan untuk memilih berkas pendukung izin.',
+                    status: _fileStatus,
+                  ),
+                if (_needsLocation)
+                  _buildPermissionTile(
+                    icon: Icons.location_on,
+                    title: 'Lokasi',
+                    description:
+                        'Digunakan untuk validasi posisi saat presensi.',
+                    status: _locationStatus,
+                  ),
+                const Spacer(),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _isRequestingAll ? null : _requestAllPermissions,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple.shade700,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: Text(
+                      _isRequestingAll ? 'Meminta izin...' : requestAllLabel,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 48,
-                child: OutlinedButton(
-                  onPressed: _continueToApp,
-                  child: const Text('Lanjut ke Aplikasi'),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  String _buildIntroText() {
+    if (_requiredPermissions.length == 1) {
+      final permission = _requiredPermissions.first;
+      switch (permission) {
+        case RequiredPermission.camera:
+          return 'Agar fitur selfie presensi dapat digunakan, aplikasi memerlukan izin kamera.';
+        case RequiredPermission.file:
+          return 'Agar fitur unggah berkas berjalan, aplikasi memerlukan izin akses file/media.';
+        case RequiredPermission.location:
+          return 'Agar validasi presensi berjalan, aplikasi memerlukan izin lokasi.';
+      }
+    }
+
+    return 'Aplikasi akan meminta izin berikut saat fitur digunakan. Anda dapat melanjutkan tanpa mengizinkan.';
+  }
+
+  Future<void> _showSettingsDialog(String permissionName) async {
+    if (!mounted) {
+      return;
+    }
+
+    final openSettings = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Izin $permissionName'),
+        content: Text(
+          'Izin $permissionName ditolak permanen. Anda dapat mengaktifkannya di Settings agar fitur berjalan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Buka Settings'),
+          ),
+        ],
+      ),
+    );
+
+    if (openSettings == true) {
+      await openAppSettings();
+    }
+
+    await _loadPermissionStatuses();
   }
 }

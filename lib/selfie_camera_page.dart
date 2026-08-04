@@ -1,10 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
-import 'dart:io';
+import 'package:http_parser/http_parser.dart';
 import 'dart:convert';
 import 'main.dart';
+import 'permission_guard.dart';
 
 class SelfieCameraPage extends StatefulWidget {
   const SelfieCameraPage({super.key});
@@ -15,7 +17,10 @@ class SelfieCameraPage extends StatefulWidget {
 
 class _SelfieCameraPageState extends State<SelfieCameraPage> {
   final ImagePicker _picker = ImagePicker();
-  File? _capturedImage;
+  // Image bytes are kept in memory because the picker's cache file
+  // (cache/scaled_*.jpg) can be deleted by the OS or cleaner apps
+  // before the user taps upload.
+  Uint8List? _capturedImageBytes;
   bool _isUploading = false;
 
   // Format datetime to Indonesian format (UTC+7)
@@ -65,17 +70,34 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
 
   Future<void> _takeSelfie() async {
     try {
+      final granted = await PermissionGuard.ensurePermission(
+        context,
+        RequiredPermission.camera,
+      );
+
+      if (!granted) {
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        return;
+      }
+
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.front,
         imageQuality: 85,
       );
 
-      if (photo != null && mounted) {
-        setState(() {
-          _capturedImage = File(photo.path);
-        });
-      } else if (mounted && _capturedImage == null) {
+      if (photo != null) {
+        // Read the bytes immediately: the cache file the picker returns
+        // may be deleted before the user taps upload.
+        final bytes = await photo.readAsBytes();
+        if (mounted) {
+          setState(() {
+            _capturedImageBytes = bytes;
+          });
+        }
+      } else if (mounted && _capturedImageBytes == null) {
         // User cancelled without taking a photo, go back
         Navigator.of(context).pop();
       }
@@ -89,7 +111,7 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
     }
   }
 
-  Future<void> _uploadImage(String imagePath) async {
+  Future<void> _uploadImage(Uint8List imageBytes) async {
     setState(() {
       _isUploading = true;
     });
@@ -140,11 +162,13 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
       // Add siswaId field
       request.fields['siswaId'] = siswaId;
 
-      // Add image file
-      final imageFile = File(imagePath);
-      final multipartFile = await http.MultipartFile.fromPath(
+      // Add image file from in-memory bytes so upload does not depend
+      // on the picker's cache file still existing.
+      final multipartFile = http.MultipartFile.fromBytes(
         'image',
-        imageFile.path,
+        imageBytes,
+        filename: 'selfie_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        contentType: MediaType('image', 'jpeg'),
       );
       request.files.add(multipartFile);
 
@@ -309,15 +333,12 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: _capturedImage != null
+      body: _capturedImageBytes != null
           ? Stack(
               children: [
                 // Image preview
                 Center(
-                  child: Image.file(
-                    _capturedImage!,
-                    fit: BoxFit.contain,
-                  ),
+                  child: Image.memory(_capturedImageBytes!, fit: BoxFit.contain),
                 ),
                 // Bottom buttons: Retake and Upload
                 Positioned(
@@ -352,7 +373,7 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
                       GestureDetector(
                         onTap: _isUploading
                             ? null
-                            : () => _uploadImage(_capturedImage!.path),
+                            : () => _uploadImage(_capturedImageBytes!),
                         child: Container(
                           width: 70,
                           height: 70,

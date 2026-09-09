@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'main.dart'; // To access SessionManager and other widgets
 import 'login_page.dart';
+import 'presensi_draft.dart';
+import 'resume_presensi_page.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,23 +21,37 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initTrackingThenNavigate() async {
-    try {
-      await MobileAds.instance.initialize();
-    } catch (e) {
-      debugPrint('MobileAds init error: $e');
-    }
-
+    // Mobile Ads SDK is initialized lazily by AdsHelper right before the
+    // first ad is actually loaded (see ads_helper.dart), not here on every
+    // launch — this keeps memory usage lower right when the app may be
+    // restarting after Android killed its process (e.g. returning from the
+    // camera), which is exactly when extra memory pressure hurts most.
     await _navigateToHome();
   }
 
   Future<void> _navigateToHome() async {
     // Load saved session first
     await SessionManager.loadSession();
+
+    // Check for a presensi selfie that never made it to the server because
+    // Android killed the app process (e.g. while the native camera app was
+    // in the foreground). If one exists, resume it instead of silently
+    // dropping the user on the dashboard.
+    final draft = SessionManager.isLoggedIn ? await PresensiDraft.read() : null;
+
     await Future.delayed(const Duration(seconds: 2), () {});
     if (mounted) {
-      final destination = SessionManager.isLoggedIn
-          ? const MyHomePage(title: 'Skanida Student')
-          : const LoginPage();
+      final Widget destination;
+      if (!SessionManager.isLoggedIn) {
+        destination = const LoginPage();
+      } else if (draft != null) {
+        destination = ResumePresensiPage(
+          photoPath: draft['path']!,
+          siswaId: draft['siswaId']!,
+        );
+      } else {
+        destination = const MyHomePage(title: 'Skanida Student');
+      }
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (BuildContext context) => destination),
       );

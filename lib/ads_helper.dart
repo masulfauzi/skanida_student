@@ -9,6 +9,23 @@ class AdsHelper {
   static InterstitialAd? _interstitialAd;
   static bool _isInterstitialAdLoaded = false;
   static bool _adsDisabled = false;
+  static bool _mobileAdsInitialized = false;
+
+  // Initialize the Mobile Ads SDK lazily, only when an ad is actually about
+  // to be loaded, instead of on every app launch. Initializing it eagerly
+  // on the splash screen adds memory pressure right at the moment the user
+  // may be returning from the camera (a moment where Android is already
+  // more likely to kill the app process on low-RAM devices), so we defer it
+  // until it's really needed.
+  static Future<void> _ensureMobileAdsInitialized() async {
+    if (_mobileAdsInitialized) return;
+    try {
+      await MobileAds.instance.initialize();
+      _mobileAdsInitialized = true;
+    } catch (e) {
+      print('MobileAds init error: $e');
+    }
+  }
 
   // Load interstitial ad (non-blocking)
   static Future<void> loadInterstitialAd() async {
@@ -16,6 +33,8 @@ class AdsHelper {
       print('Ads are disabled for this environment.');
       return;
     }
+
+    await _ensureMobileAdsInitialized();
 
     print('Loading interstitial ad...');
 

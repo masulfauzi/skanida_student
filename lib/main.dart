@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -180,7 +181,22 @@ String formatDateIndonesian(DateTime date) {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+
+  // Log uncaught Dart/Flutter errors instead of letting them fail silently.
+  // This does not catch Android process death (that's the OS killing the
+  // whole process, not a Dart exception) but it does help tell a genuine
+  // app bug apart from a process-death restart when debugging future
+  // crash reports.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('Uncaught Flutter error: ${details.exceptionAsString()}');
+  };
+
+  runZonedGuarded(() {
+    runApp(const MyApp());
+  }, (error, stack) {
+    debugPrint('Uncaught zone error: $error\n$stack');
+  });
 }
 
 class MyApp extends StatelessWidget {

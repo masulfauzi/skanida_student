@@ -2,11 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
-import 'dart:convert';
 import 'main.dart';
 import 'permission_guard.dart';
+import 'presensi_draft.dart';
+import 'presensi_uploader.dart';
 
 class SelfieCameraPage extends StatefulWidget {
   const SelfieCameraPage({super.key});
@@ -19,45 +18,10 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
   final ImagePicker _picker = ImagePicker();
   // Image bytes are kept in memory because the picker's cache file
   // (cache/scaled_*.jpg) can be deleted by the OS or cleaner apps
-  // before the user taps upload.
+  // before the user taps upload. A copy is also persisted to disk via
+  // PresensiDraft so the photo survives the app process being killed
+  // by Android while the native camera app is in the foreground.
   Uint8List? _capturedImageBytes;
-  bool _isUploading = false;
-
-  // Format datetime to Indonesian format (UTC+7)
-  String _formatDateTimeIndonesian(String dateTimeString) {
-    try {
-      // Parse UTC datetime
-      final dateTimeUtc = DateTime.parse(dateTimeString);
-
-      // Convert to Indonesian time (UTC+7)
-      final dateTimeIndonesia = dateTimeUtc.add(const Duration(hours: 7));
-
-      const List<String> monthsIndonesian = [
-        'Januari',
-        'Februari',
-        'Maret',
-        'April',
-        'Mei',
-        'Juni',
-        'Juli',
-        'Agustus',
-        'September',
-        'Oktober',
-        'November',
-        'Desember',
-      ];
-
-      final day = dateTimeIndonesia.day;
-      final month = monthsIndonesian[dateTimeIndonesia.month - 1];
-      final year = dateTimeIndonesia.year;
-      final hour = dateTimeIndonesia.hour.toString().padLeft(2, '0');
-      final minute = dateTimeIndonesia.minute.toString().padLeft(2, '0');
-
-      return '$day $month $year, $hour:$minute WIB';
-    } catch (e) {
-      return dateTimeString; // Return original string if parsing fails
-    }
-  }
 
   @override
   void initState() {
@@ -88,19 +52,33 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
         imageQuality: 85,
       );
 
-      if (photo != null) {
-        // Read the bytes immediately: the cache file the picker returns
-        // may be deleted before the user taps upload.
-        final bytes = await photo.readAsBytes();
-        if (mounted) {
-          setState(() {
-            _capturedImageBytes = bytes;
-          });
+      if (photo == null) {
+        // User membatalkan dari aplikasi kamera OS, tidak ada foto baru.
+        if (mounted && _capturedImageBytes == null) {
+          Navigator.of(context).pop();
         }
-      } else if (mounted && _capturedImageBytes == null) {
-        // User cancelled without taking a photo, go back
-        Navigator.of(context).pop();
+        return;
       }
+
+      // Read the bytes immediately: the cache file the picker returns
+      // may be deleted before the upload request finishes.
+      final bytes = await photo.readAsBytes();
+      if (mounted) {
+        setState(() {
+          _capturedImageBytes = bytes;
+        });
+      }
+
+      // Persist the photo to disk right away so it isn't lost if the
+      // OS kills the app process before/while the upload is happening.
+      final siswaId = SessionManager.siswaId;
+      if (siswaId != null) {
+        await PresensiDraft.save(bytes: bytes, siswaId: siswaId);
+      }
+
+      // Tidak ada lagi langkah konfirmasi manual: begitu foto diambil,
+      // langsung kirim ke server.
+      await _uploadImage(bytes);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -112,201 +90,94 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
   }
 
   Future<void> _uploadImage(Uint8List imageBytes) async {
-    setState(() {
-      _isUploading = true;
-    });
-    try {
-      // Get siswaId from SessionManager and authToken from SharedPreferences
-      final siswaId = SessionManager.siswaId;
-      final prefs = await SharedPreferences.getInstance();
-      final authToken = prefs.getString('auth_token');
+    // Get siswaId from SessionManager and authToken from SharedPreferences
+    final siswaId = SessionManager.siswaId;
+    final prefs = await SharedPreferences.getInstance();
+    final authToken = prefs.getString('auth_token');
 
-      if (siswaId == null) {
-        if (mounted) {
-          setState(() {
-            _isUploading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Siswa ID tidak ditemukan. Silakan login kembali.'),
-            ),
-          );
-        }
-        return;
-      }
-
-      if (authToken == null) {
-        if (mounted) {
-          setState(() {
-            _isUploading = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Token autentikasi tidak ditemukan. Silakan login kembali.',
-              ),
-            ),
-          );
-        }
-        return;
-      }
-
-      // Prepare multipart request
-      final uri = Uri.parse('$API_BASE_URL/presensi');
-      final request = http.MultipartRequest('POST', uri);
-
-      // Add authentication header
-      request.headers['Authorization'] = 'Bearer $authToken';
-      request.headers['Accept'] = 'application/json';
-
-      // Add siswaId field
-      request.fields['siswaId'] = siswaId;
-
-      // Add image file from in-memory bytes so upload does not depend
-      // on the picker's cache file still existing.
-      final multipartFile = http.MultipartFile.fromBytes(
-        'image',
-        imageBytes,
-        filename: 'selfie_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        contentType: MediaType('image', 'jpeg'),
-      );
-      request.files.add(multipartFile);
-
-      // Send request
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
-
+    if (siswaId == null) {
       if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          // Parse response
-          try {
-            final jsonResponse = json.decode(response.body);
-            // Show success dialog with attendance details
-            _showSuccessDialog(jsonResponse);
-          } catch (e) {
-            // If JSON parsing fails, show the raw response
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Response parsing error: ${e.toString()}\nResponse: ${response.body}',
-                ),
-                duration: const Duration(seconds: 5),
-              ),
-            );
-          }
-        } else {
-          // Handle error - show detailed error information
-          String errorMessage = 'Status ${response.statusCode}: ';
-          try {
-            final errorJson = json.decode(response.body);
-            errorMessage += errorJson['message'] ?? errorJson.toString();
-          } catch (e) {
-            // If response is not JSON, show raw body
-            errorMessage += response.body;
-          }
-
-          // Show error to user
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              duration: const Duration(seconds: 5),
-              backgroundColor: Colors.red.shade700,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isUploading = false;
-        });
-
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error uploading image: ${e.toString()}'),
-            duration: const Duration(seconds: 5),
-            backgroundColor: Colors.red.shade700,
+          const SnackBar(
+            content: Text('Siswa ID tidak ditemukan. Silakan login kembali.'),
           ),
         );
+        Navigator.of(context).pop();
       }
+      return;
+    }
+
+    if (authToken == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Token autentikasi tidak ditemukan. Silakan login kembali.',
+            ),
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+      return;
+    }
+
+    final result = await PresensiUploader.upload(
+      imageBytes: imageBytes,
+      siswaId: siswaId,
+      authToken: authToken,
+    );
+
+    if (!mounted) return;
+
+    if (result.success) {
+      // Upload succeeded: the pending draft is no longer needed.
+      await PresensiDraft.clear();
+      if (!mounted) return;
+      await showPresensiSuccessDialog(
+        context,
+        result.data!,
+        onClose: () => Navigator.of(context).pop(true),
+      );
+    } else {
+      await _showUploadFailedDialog(
+        result.errorMessage ?? 'Gagal mengirim presensi',
+        imageBytes,
+      );
     }
   }
 
-  void _showSuccessDialog(Map<String, dynamic> data) {
-    showDialog(
+  Future<void> _showUploadFailedDialog(String message, Uint8List bytes) async {
+    if (!mounted) return;
+    await showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Presensi Gagal Terkirim'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop(); // tutup dialog
+              await PresensiDraft.clear();
+              if (mounted) {
+                Navigator.of(context).pop(); // kembali ke halaman Presensi
+              }
+            },
+            child: const Text('Batal'),
           ),
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green.shade600, size: 32),
-              const SizedBox(width: 12),
-              const Text('Presensi Berhasil'),
-            ],
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(); // tutup dialog
+              _takeSelfie(); // buka kamera lagi, ambil foto baru
+            },
+            child: const Text('Ambil Ulang'),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDetailRow(
-                'Waktu',
-                _formatDateTimeIndonesian(
-                  data['data']?['created_at'] ??
-                      data['data']?['updated_at'] ??
-                      data['waktu'] ??
-                      data['timestamp'] ??
-                      '-',
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pop(true); // Return to previous page
-              },
-              child: Text(
-                'OK',
-                style: TextStyle(
-                  color: Colors.deepPurple.shade900,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          const Text(': '),
-          Expanded(
-            child: Text(value, style: const TextStyle(color: Colors.black87)),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop(); // tutup dialog
+              _uploadImage(bytes); // kirim ulang foto yang sama
+            },
+            child: const Text('Coba Lagi'),
           ),
         ],
       ),
@@ -333,77 +204,32 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: _capturedImageBytes != null
-          ? Stack(
+      body: _capturedImageBytes == null
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            )
+          : Stack(
+              fit: StackFit.expand,
               children: [
-                // Image preview
-                Center(
-                  child: Image.memory(_capturedImageBytes!, fit: BoxFit.contain),
-                ),
-                // Bottom buttons: Retake and Upload
-                Positioned(
-                  bottom: 40,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                // Preview foto yang baru diambil
+                Image.memory(_capturedImageBytes!, fit: BoxFit.contain),
+                // Overlay gelap + status pengiriman
+                Container(color: Colors.black.withOpacity(0.45)),
+                const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Retake button
-                      GestureDetector(
-                        onTap: _isUploading ? null : _takeSelfie,
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(
-                              color: Colors.grey.shade600,
-                              width: 3,
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.refresh,
-                            size: 30,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ),
-                      // Upload button
-                      GestureDetector(
-                        onTap: _isUploading
-                            ? null
-                            : () => _uploadImage(_capturedImageBytes!),
-                        child: Container(
-                          width: 70,
-                          height: 70,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(
-                              color: Colors.deepPurple.shade900,
-                              width: 4,
-                            ),
-                          ),
-                          child: _isUploading
-                              ? const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Colors.deepPurple,
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.check,
-                                  size: 35,
-                                  color: Colors.deepPurple.shade900,
-                                ),
-                        ),
+                      CircularProgressIndicator(color: Colors.white),
+                      SizedBox(height: 16),
+                      Text(
+                        'Mengirim presensi...',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
                       ),
                     ],
                   ),
                 ),
               ],
-            )
-          : const Center(child: CircularProgressIndicator(color: Colors.white)),
+            ),
     );
   }
 }

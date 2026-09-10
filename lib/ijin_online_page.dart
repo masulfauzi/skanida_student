@@ -122,14 +122,6 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
 
   // Pick file from device
   Future<void> _pickFile() async {
-    final granted = await PermissionGuard.ensurePermission(
-      context,
-      RequiredPermission.file,
-    );
-    if (!granted) {
-      return;
-    }
-
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,

@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +24,6 @@ class PermissionPreAlertPage extends StatefulWidget {
 
 class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
   PermissionStatus _cameraStatus = PermissionStatus.denied;
-  PermissionStatus _fileStatus = PermissionStatus.denied;
   PermissionStatus _locationStatus = PermissionStatus.denied;
 
   bool _isRequestingAll = false;
@@ -35,14 +32,12 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     return widget.requiredPermissions ??
         {
           RequiredPermission.camera,
-          RequiredPermission.file,
           RequiredPermission.location,
         };
   }
 
   bool get _needsCamera =>
       _requiredPermissions.contains(RequiredPermission.camera);
-  bool get _needsFile => _requiredPermissions.contains(RequiredPermission.file);
   bool get _needsLocation =>
       _requiredPermissions.contains(RequiredPermission.location);
 
@@ -52,10 +47,9 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     }
 
     final cameraOk = !_needsCamera || _isAllowed(_cameraStatus);
-    final fileOk = !_needsFile || _isAllowed(_fileStatus);
     final locationOk = !_needsLocation || _isAllowed(_locationStatus);
 
-    return cameraOk && fileOk && locationOk;
+    return cameraOk && locationOk;
   }
 
   @override
@@ -73,9 +67,6 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     final camera = _needsCamera
         ? await Permission.camera.status
         : _cameraStatus;
-    final file = _needsFile
-        ? await _currentFilePermissionStatus()
-        : _fileStatus;
     final location = _needsLocation
         ? await Permission.locationWhenInUse.status
         : _locationStatus;
@@ -86,22 +77,8 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
 
     setState(() {
       _cameraStatus = camera;
-      _fileStatus = file;
       _locationStatus = location;
     });
-  }
-
-  Future<PermissionStatus> _currentFilePermissionStatus() async {
-    if (Platform.isAndroid) {
-      final storage = await Permission.storage.status;
-      if (_isAllowed(storage)) {
-        return storage;
-      }
-      final photos = await Permission.photos.status;
-      return _isAllowed(photos) ? photos : storage;
-    }
-
-    return Permission.photos.status;
   }
 
   Future<void> _requestCameraPermission() async {
@@ -121,39 +98,6 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
 
     if (status == PermissionStatus.permanentlyDenied) {
       await _showSettingsDialog('Kamera');
-    }
-  }
-
-  Future<void> _requestFilePermission() async {
-    if (_fileStatus == PermissionStatus.permanentlyDenied) {
-      await _showSettingsDialog('File/Media');
-      return;
-    }
-
-    PermissionStatus status;
-
-    if (Platform.isAndroid) {
-      final storageStatus = await Permission.storage.request();
-      if (_isAllowed(storageStatus)) {
-        status = storageStatus;
-      } else {
-        final photosStatus = await Permission.photos.request();
-        status = _isAllowed(photosStatus) ? photosStatus : storageStatus;
-      }
-    } else {
-      status = await Permission.photos.request();
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _fileStatus = status;
-    });
-
-    if (status == PermissionStatus.permanentlyDenied) {
-      await _showSettingsDialog('File/Media');
     }
   }
 
@@ -185,16 +129,12 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     if (_needsCamera) {
       await _requestCameraPermission();
     }
-    if (_needsFile) {
-      await _requestFilePermission();
-    }
     if (_needsLocation) {
       await _requestLocationPermission();
     }
 
     final hasPermanentDeny =
         (_needsCamera && _cameraStatus == PermissionStatus.permanentlyDenied) ||
-        (_needsFile && _fileStatus == PermissionStatus.permanentlyDenied) ||
         (_needsLocation &&
             _locationStatus == PermissionStatus.permanentlyDenied);
 
@@ -351,14 +291,6 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
                         'Digunakan untuk selfie presensi dan unggah bukti.',
                     status: _cameraStatus,
                   ),
-                if (_needsFile)
-                  _buildPermissionTile(
-                    icon: Icons.folder,
-                    title: 'File / Media',
-                    description:
-                        'Digunakan untuk memilih berkas pendukung izin.',
-                    status: _fileStatus,
-                  ),
                 if (_needsLocation)
                   _buildPermissionTile(
                     icon: Icons.location_on,
@@ -395,8 +327,6 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
       switch (permission) {
         case RequiredPermission.camera:
           return 'Agar fitur selfie presensi dapat digunakan, aplikasi memerlukan izin kamera.';
-        case RequiredPermission.file:
-          return 'Agar fitur unggah berkas berjalan, aplikasi memerlukan izin akses file/media.';
         case RequiredPermission.location:
           return 'Agar validasi presensi berjalan, aplikasi memerlukan izin lokasi.';
       }

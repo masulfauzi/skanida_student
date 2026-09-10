@@ -1,5 +1,3 @@
-import 'dart:io' show Platform;
-
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -14,25 +12,10 @@ class PermissionGuard {
         status == PermissionStatus.limited;
   }
 
-  static Future<PermissionStatus> _filePermissionStatus() async {
-    if (Platform.isAndroid) {
-      final storage = await Permission.storage.status;
-      if (_isAllowed(storage)) {
-        return storage;
-      }
-      final photos = await Permission.photos.status;
-      return _isAllowed(photos) ? photos : storage;
-    }
-
-    return Permission.photos.status;
-  }
-
   static Future<bool> hasPermission(RequiredPermission permission) async {
     switch (permission) {
       case RequiredPermission.camera:
         return _isAllowed(await Permission.camera.status);
-      case RequiredPermission.file:
-        return _isAllowed(await _filePermissionStatus());
       case RequiredPermission.location:
         return _isAllowed(await Permission.locationWhenInUse.status);
     }

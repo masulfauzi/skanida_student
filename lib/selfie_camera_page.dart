@@ -49,7 +49,9 @@ class _SelfieCameraPageState extends State<SelfieCameraPage> {
       final XFile? photo = await _picker.pickImage(
         source: ImageSource.camera,
         preferredCameraDevice: CameraDevice.front,
-        imageQuality: 85,
+        maxWidth: 640,
+        maxHeight: 640,
+        imageQuality: 80,
       );
 
       if (photo == null) {

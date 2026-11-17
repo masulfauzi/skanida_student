@@ -29,7 +29,7 @@ management library, routing generator, atau layer repository — tiap halaman ad
 
 - `lib/main.dart` — `API_BASE_URL`, `AuthService.loginWithAPI`, `SessionManager`
   (state sesi statis + persist ke `SharedPreferences`: `auth_token`, `siswa_id`, `username`, dll),
-  `formatDateIndonesian`, `MyApp`, dan dashboard `MyHomePage` (grid menu + dialog `/pesan-harian`).
+  `formatDateIndonesian`, `MyApp`, dan dashboard `MyHomePage` (grid menu).
   Halaman lain `import 'main.dart'` untuk mengakses `SessionManager` & `API_BASE_URL`.
 - Auth: header `Authorization: Bearer ${SessionManager.authToken}` + `Accept: application/json`.
   `SessionManager.currentUsername` = NISN.

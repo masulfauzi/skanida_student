@@ -48,3 +48,4 @@ upload-keystore.jks
 ios/build/
 
 prompt.txt
+dump/

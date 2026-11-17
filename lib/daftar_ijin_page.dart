@@ -99,6 +99,11 @@ class _DaftarIjinPageState extends State<DaftarIjinPage> {
     }
   }
 
+  bool _isRejected(String? status) {
+    final s = status?.toLowerCase();
+    return s == 'ditolak' || s == 'rejected';
+  }
+
   // Get status text
   String _getStatusText(String? status) {
     switch (status?.toLowerCase()) {
@@ -264,6 +269,66 @@ class _DaftarIjinPageState extends State<DaftarIjinPage> {
                                               ),
                                             ),
                                           ],
+                                        ),
+                                      ],
+                                      if (_isRejected(ijin['status_ijin']) &&
+                                          (ijin['alasan_tolak']
+                                                  ?.toString()
+                                                  .trim()
+                                                  .isNotEmpty ??
+                                              false)) ...[
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.shade50,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: Colors.red.shade200,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Icon(
+                                                Icons.info_outline,
+                                                size: 18,
+                                                color: Colors.red.shade700,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'Alasan ditolak',
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 12,
+                                                        color:
+                                                            Colors.red.shade700,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      ijin['alasan_tolak']
+                                                          .toString()
+                                                          .trim(),
+                                                      style: TextStyle(
+                                                        color:
+                                                            Colors.red.shade900,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ],

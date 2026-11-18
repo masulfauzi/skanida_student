@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'permission_types.dart';
+import 'push_notification_service.dart';
 
 const String permissionPreAlertSeenKey = 'permission_pre_alert_seen';
 
@@ -25,21 +26,21 @@ class PermissionPreAlertPage extends StatefulWidget {
 class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
   PermissionStatus _cameraStatus = PermissionStatus.denied;
   PermissionStatus _locationStatus = PermissionStatus.denied;
+  PermissionStatus _notificationStatus = PermissionStatus.denied;
 
   bool _isRequestingAll = false;
 
   Set<RequiredPermission> get _requiredPermissions {
     return widget.requiredPermissions ??
-        {
-          RequiredPermission.camera,
-          RequiredPermission.location,
-        };
+        {RequiredPermission.camera, RequiredPermission.location};
   }
 
   bool get _needsCamera =>
       _requiredPermissions.contains(RequiredPermission.camera);
   bool get _needsLocation =>
       _requiredPermissions.contains(RequiredPermission.location);
+  bool get _needsNotification =>
+      _requiredPermissions.contains(RequiredPermission.notification);
 
   bool get _allPermissionsGranted {
     if (_requiredPermissions.isEmpty) {
@@ -48,8 +49,10 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
 
     final cameraOk = !_needsCamera || _isAllowed(_cameraStatus);
     final locationOk = !_needsLocation || _isAllowed(_locationStatus);
+    final notificationOk =
+        !_needsNotification || _isAllowed(_notificationStatus);
 
-    return cameraOk && locationOk;
+    return cameraOk && locationOk && notificationOk;
   }
 
   @override
@@ -70,6 +73,9 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     final location = _needsLocation
         ? await Permission.locationWhenInUse.status
         : _locationStatus;
+    final notification = _needsNotification
+        ? await Permission.notification.status
+        : _notificationStatus;
 
     if (!mounted) {
       return;
@@ -78,6 +84,7 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     setState(() {
       _cameraStatus = camera;
       _locationStatus = location;
+      _notificationStatus = notification;
     });
   }
 
@@ -121,6 +128,30 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     }
   }
 
+  Future<void> _requestNotificationPermission() async {
+    if (_notificationStatus == PermissionStatus.permanentlyDenied) {
+      await _showSettingsDialog('Notifikasi');
+      return;
+    }
+
+    final status = await Permission.notification.request();
+    if (_isAllowed(status)) {
+      // Di iOS token FCM kadang baru tersedia setelah izin diberikan.
+      PushNotificationService.registerToken();
+    }
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _notificationStatus = status;
+    });
+
+    if (status == PermissionStatus.permanentlyDenied) {
+      await _showSettingsDialog('Notifikasi');
+    }
+  }
+
   Future<void> _requestAllPermissions() async {
     setState(() {
       _isRequestingAll = true;
@@ -132,11 +163,16 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
     if (_needsLocation) {
       await _requestLocationPermission();
     }
+    if (_needsNotification) {
+      await _requestNotificationPermission();
+    }
 
     final hasPermanentDeny =
         (_needsCamera && _cameraStatus == PermissionStatus.permanentlyDenied) ||
         (_needsLocation &&
-            _locationStatus == PermissionStatus.permanentlyDenied);
+            _locationStatus == PermissionStatus.permanentlyDenied) ||
+        (_needsNotification &&
+            _notificationStatus == PermissionStatus.permanentlyDenied);
 
     if (hasPermanentDeny) {
       if (mounted) {
@@ -299,6 +335,14 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
                         'Digunakan untuk validasi posisi saat presensi.',
                     status: _locationStatus,
                   ),
+                if (_needsNotification)
+                  _buildPermissionTile(
+                    icon: Icons.notifications_active,
+                    title: 'Notifikasi',
+                    description:
+                        'Untuk memberi tahu status izin dan pengumuman sekolah.',
+                    status: _notificationStatus,
+                  ),
                 const Spacer(),
                 SizedBox(
                   height: 48,
@@ -329,6 +373,8 @@ class _PermissionPreAlertPageState extends State<PermissionPreAlertPage> {
           return 'Agar fitur selfie presensi dapat digunakan, aplikasi memerlukan izin kamera.';
         case RequiredPermission.location:
           return 'Agar validasi presensi berjalan, aplikasi memerlukan izin lokasi.';
+        case RequiredPermission.notification:
+          return 'Aktifkan notifikasi agar Anda tahu saat izin disetujui atau ditolak, serta menerima pengumuman sekolah.';
       }
     }
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "318053885487",
+    "project_id": "skanida-54df2",
+    "storage_bucket": "skanida-54df2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:318053885487:android:3ac207e60a045a61a308da",
+        "android_client_info": {
+          "package_name": "com.sahasika.skanida_student"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLQCIAp9eR0gNJs5P7kNYW2pScyt47wJI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

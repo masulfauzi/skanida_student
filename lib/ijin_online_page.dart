@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'main.dart';
 import 'ads_helper.dart';
@@ -308,6 +309,7 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
           );
           // Show interstitial ad before navigating back (non-blocking)
           await AdsHelper.showInterstitialAd();
+          await _offerNotificationPermissionOnce();
           if (mounted) {
             Navigator.of(context).pop();
           }
@@ -332,6 +334,23 @@ class _IjinOnlinePageState extends State<IjinOnlinePage> {
         });
       }
     }
+  }
+
+  /// Tawarkan izin notifikasi sekali seumur instalasi, tepat setelah siswa
+  /// mengajukan izin (saat notifikasi status izin paling relevan).
+  Future<void> _offerNotificationPermissionOnce() async {
+    const key = 'notif_prompt_after_ijin_shown';
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(key) ?? false) return;
+    if (await PermissionGuard.hasPermission(RequiredPermission.notification)) {
+      return;
+    }
+    await prefs.setBool(key, true);
+    if (!mounted) return;
+    await PermissionGuard.ensurePermission(
+      context,
+      RequiredPermission.notification,
+    );
   }
 
   @override

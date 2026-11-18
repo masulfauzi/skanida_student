@@ -1,1 +1,1 @@
-enum RequiredPermission { camera, location }
+enum RequiredPermission { camera, location, notification }

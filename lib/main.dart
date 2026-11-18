@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -13,10 +15,19 @@ import 'keluar_kelas_page.dart';
 import 'riwayat_izin_page.dart';
 import 'presensi_sholat_page.dart';
 import 'ijin_sholat_page.dart';
+import 'firebase_options.dart';
+import 'permission_guard.dart';
+import 'push_notification_service.dart';
+import 'notifikasi_page.dart';
+import 'notifikasi_store.dart';
 
 // API Configuration
 const String API_BASE_URL = 'https://apps.smkn2semarang.sch.id/api';
 const String LOGIN_ENDPOINT = '/login';
+
+/// Navigator global, dipakai untuk navigasi dari luar widget (mis. saat
+/// notifikasi di-tap).
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class AuthService {
   static Future<Map<String, dynamic>> loginWithAPI(
@@ -149,6 +160,9 @@ class SessionManager {
   }
 
   static void logout() {
+    // Hapus token FCM di server memakai auth token yang masih ada. Tidak
+    // di-await agar tombol logout tetap instan.
+    PushNotificationService.unregister(authToken: authToken);
     isLoggedIn = false;
     currentUsername = null;
     currentUserName = null;
@@ -182,6 +196,17 @@ String formatDateIndonesian(DateTime date) {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Hanya ini yang dijalankan saat startup. Listener, izin & token push
+  // diinisialisasi belakangan (splash / setelah login).
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase.initializeApp gagal: $e');
+  }
+
   // Log uncaught Dart/Flutter errors instead of letting them fail silently.
   // This does not catch Android process death (that's the OS killing the
   // whole process, not a Dart exception) but it does help tell a genuine
@@ -192,11 +217,14 @@ void main() async {
     debugPrint('Uncaught Flutter error: ${details.exceptionAsString()}');
   };
 
-  runZonedGuarded(() {
-    runApp(const MyApp());
-  }, (error, stack) {
-    debugPrint('Uncaught zone error: $error\n$stack');
-  });
+  runZonedGuarded(
+    () {
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      debugPrint('Uncaught zone error: $error\n$stack');
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -207,6 +235,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Skanida Student',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
@@ -238,7 +267,139 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
+  static const String _notifBannerDismissedKey = 'notif_banner_dismissed';
+  bool _showNotifBanner = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Notifikasi yang membuka app saat app mati diproses di sini (bukan di
+    // splash) agar draft presensi tetap didahulukan.
+    PushNotificationService.consumePending();
+    _checkNotificationBanner();
+    _refreshNotifikasi();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Riwayat bisa bertambah saat app di background (ditulis background
+    // handler FCM / masih di Notification Center iOS).
+    if (state == AppLifecycleState.resumed) _refreshNotifikasi();
+  }
+
+  Future<void> _refreshNotifikasi() async {
+    await PushNotificationService.importDelivered();
+    await NotifikasiStore.refreshUnreadCount();
+  }
+
+  Future<void> _openNotifikasi() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotifikasiPage()));
+    await NotifikasiStore.refreshUnreadCount();
+  }
+
+  Widget _buildNotifBell() {
+    return ValueListenableBuilder<int>(
+      valueListenable: NotifikasiStore.unreadCount,
+      builder: (context, count, _) => IconButton(
+        tooltip: 'Notifikasi',
+        onPressed: _openNotifikasi,
+        icon: Badge(
+          isLabelVisible: count > 0,
+          label: Text(count > 99 ? '99+' : '$count'),
+          backgroundColor: Colors.amber.shade700,
+          textColor: Colors.black,
+          child: Icon(
+            count > 0 ? Icons.notifications_active : Icons.notifications,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _checkNotificationBanner() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_notifBannerDismissedKey) ?? false) return;
+    final granted = await PermissionGuard.hasPermission(
+      RequiredPermission.notification,
+    );
+    if (!mounted) return;
+    setState(() => _showNotifBanner = !granted);
+  }
+
+  Future<void> _enableNotifications() async {
+    final granted = await PermissionGuard.ensurePermission(
+      context,
+      RequiredPermission.notification,
+    );
+    if (!mounted) return;
+    if (granted) {
+      setState(() => _showNotifBanner = false);
+    }
+  }
+
+  Future<void> _dismissNotifBanner() async {
+    setState(() => _showNotifBanner = false);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_notifBannerDismissedKey, true);
+  }
+
+  Widget _buildNotifBanner() {
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      color: Colors.deepPurple.shade50,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.notifications_active,
+                  color: Colors.deepPurple.shade700,
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Aktifkan notifikasi untuk menerima status izin & '
+                    'pengumuman sekolah.',
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _dismissNotifBanner,
+                  child: const Text('Nanti'),
+                ),
+                TextButton(
+                  onPressed: _enableNotifications,
+                  child: const Text('Aktifkan'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildIconCard(IconData icon, String label, {VoidCallback? onTap}) {
     final child = Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -290,6 +451,7 @@ class _MyHomePageState extends State<MyHomePage> {
         // the App.build method, and use it to set our appbar title.
         title: Text(widget.title, style: const TextStyle(color: Colors.white)),
         actions: [
+          _buildNotifBell(),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () {
@@ -336,6 +498,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ],
             ),
           ),
+          if (_showNotifBanner) _buildNotifBanner(),
           // Icons Grid
           Expanded(
             child: GridView.count(

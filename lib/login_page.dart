@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'main.dart'; // To access AuthService and SessionManager
+import 'push_notification_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -45,6 +46,7 @@ class _LoginPageState extends State<LoginPage> {
         id: result['userId'],
         siswaIdValue: result['siswaId'],
       );
+      PushNotificationService.registerToken(); // sengaja tanpa await
 
       Navigator.of(context).pushReplacementNamed('/home');
     } else {
@@ -222,7 +224,9 @@ class _LoginPageState extends State<LoginPage> {
                 GestureDetector(
                   onTap: () {
                     launchUrl(
-                      Uri.parse('https://apps.smkn2semarang.sch.id/forgot-password'),
+                      Uri.parse(
+                        'https://apps.smkn2semarang.sch.id/forgot-password',
+                      ),
                       mode: LaunchMode.externalApplication,
                     );
                   },

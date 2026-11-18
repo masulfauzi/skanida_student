@@ -30,7 +30,16 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-5301423854650604~7088403788" />
-        
+
+        <!-- Firebase Cloud Messaging: channel & ikon default untuk notifikasi
+             yang ditampilkan sistem saat app di background/terminated. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="pengumuman" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -53,6 +62,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+: izin runtime untuk menampilkan notifikasi -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Google Mobile Ads permission for Ad ID -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 </manifest>

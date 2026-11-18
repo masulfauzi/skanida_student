@@ -18,6 +18,9 @@ class PermissionGuard {
         return _isAllowed(await Permission.camera.status);
       case RequiredPermission.location:
         return _isAllowed(await Permission.locationWhenInUse.status);
+      case RequiredPermission.notification:
+        // Android 12 ke bawah: otomatis granted.
+        return _isAllowed(await Permission.notification.status);
     }
   }
 

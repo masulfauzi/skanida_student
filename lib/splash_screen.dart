@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'main.dart'; // To access SessionManager and other widgets
 import 'login_page.dart';
 import 'presensi_draft.dart';
+import 'push_notification_service.dart';
 import 'resume_presensi_page.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -32,6 +33,12 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> _navigateToHome() async {
     // Load saved session first
     await SessionManager.loadSession();
+
+    // Listener FCM, channel Android, & notifikasi yang membuka app.
+    await PushNotificationService.init();
+    if (SessionManager.isLoggedIn) {
+      PushNotificationService.registerToken(); // sengaja tanpa await
+    }
 
     // Check for a presensi selfie that never made it to the server because
     // Android killed the app process (e.g. while the native camera app was

@@ -1,3 +1,19 @@
+# Catatan Rilis - Skanida Student v1.5.0
+
+**Platform:** Android, iOS
+
+### Yang baru
+- **Notifikasi status izin**: dapatkan pemberitahuan saat pengajuan izin disetujui atau ditolak. Tap notifikasi untuk langsung membuka Daftar Ijin.
+- **Pengumuman sekolah**: pengumuman dari sekolah kini dikirim sebagai notifikasi dan bisa dibaca di aplikasi.
+- **Alasan penolakan izin** ditampilkan di Daftar Ijin.
+- **Menu Notifikasi** (ikon lonceng di beranda): riwayat notifikasi yang diterima di HP ini, dengan penanda sudah/belum dibaca dan tombol "Tandai semua dibaca".
+
+### Catatan
+- Izin notifikasi bersifat opsional dan hanya diminta saat relevan. Aktifkan lewat banner di beranda bila ingin menerima notifikasi.
+- Notifikasi otomatis berhenti dikirim ke perangkat setelah logout.
+
+---
+
 # Catatan Rilis - Skanida Student v1.0.0
 
 **Tanggal Rilis:** Februari 2026  

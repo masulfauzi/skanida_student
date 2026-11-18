@@ -33,6 +33,11 @@ Aplikasi Skanida Student mengumpulkan informasi berikut:
 - Identifier unik perangkat
 - Log aktivitas aplikasi
 
+### 2.5 Token Notifikasi
+- Token perangkat dari Firebase Cloud Messaging (FCM), hanya jika Anda login
+- Jenis platform perangkat (Android/iOS)
+- Token ini disimpan di server sekolah dan dikaitkan dengan akun Anda, semata-mata untuk mengirim notifikasi
+
 ## 3. Bagaimana Kami Menggunakan Data
 
 Data yang dikumpulkan digunakan untuk:
@@ -41,7 +46,7 @@ Data yang dikumpulkan digunakan untuk:
 - **Manajemen Presensi:** Mencatat dan melacak presensi siswa
 - **Manajemen Izin:** Memproses permintaan izin dan menampilkan riwayat izin
 - **Pelaporan:** Membuat laporan akademik dan administratif
-- **Komunikasi:** Mengirimkan notifikasi penting terkait presensi dan izin
+- **Komunikasi:** Mengirimkan notifikasi status pengajuan izin (disetujui/ditolak) dan pengumuman sekolah
 - **Perbaikan Layanan:** Menganalisis penggunaan aplikasi untuk perbaikan berkelanjutan
 - **Keamanan:** Mencegah penggunaan yang tidak sah dan melindungi dari ancaman keamanan
 
@@ -51,6 +56,7 @@ Data yang dikumpulkan digunakan untuk:
 Data berikut disimpan secara lokal di perangkat Anda menggunakan SharedPreferences:
 - Status login
 - Token autentikasi
+- Riwayat notifikasi yang diterima (maksimal 100 terakhir) beserta status sudah/belum dibaca
 - Nama pengguna
 - ID pengguna
 - Informasi siswa
@@ -90,8 +96,16 @@ Aplikasi menggunakan layanan pihak ketiga berikut:
 - **HTTP Client Library:** Untuk komunikasi dengan server
 - **SharedPreferences:** Untuk penyimpanan data lokal
 - **Flutter Framework:** Untuk menjalankan aplikasi
+- **Firebase Cloud Messaging (Google):** Untuk mengirimkan push notification. Isi notifikasi tidak memuat data sensitif (misalnya alasan izin atau NISN); detail hanya ditampilkan di dalam aplikasi
 
 Kami tidak membagikan data pribadi Anda dengan layanan-layanan ini di luar kebutuhan fungsional.
+
+### 7.1 Notifikasi
+- Izin notifikasi bersifat **opsional**. Aplikasi tetap dapat digunakan sepenuhnya tanpa izin ini
+- Izin notifikasi diminta saat relevan (misalnya setelah mengajukan izin), bukan saat aplikasi pertama kali dibuka
+- Token notifikasi dihapus dari server dan dinonaktifkan di perangkat saat Anda logout
+- **Riwayat notifikasi** (menu Notifikasi) disimpan **hanya di perangkat Anda**, terpisah per akun, dan tidak dikirim ke server. Riwayat ikut terhapus bila data aplikasi dihapus atau aplikasi di-uninstall
+- Anda dapat mematikan notifikasi kapan saja melalui pengaturan perangkat, termasuk per kategori (Status Izin / Pengumuman Sekolah) di Android
 
 ## 8. Hak Pengguna
 
@@ -142,6 +156,6 @@ Dengan menggunakan aplikasi Skanida Student, Anda menerima kebijakan privasi ini
 
 ---
 
-**Versi:** 1.0
-**Tanggal Pembaruan Terakhir:** Februari 2026
+**Versi:** 1.1
+**Tanggal Pembaruan Terakhir:** November 2026
 **Status:** Aktif

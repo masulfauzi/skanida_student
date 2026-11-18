@@ -29,6 +29,12 @@ Aplikasi Skanida Student dirancang khusus untuk memudahkan siswa dalam mengelola
   - Pengajuan izin meninggalkan kelas
   - Pengajuan izin sholat (Presensi Sholat)
   - Tracking status persetujuan
+  - Notifikasi saat izin disetujui atau ditolak
+
+✓ Notifikasi & Pengumuman
+  - Push notification status pengajuan izin
+  - Pengumuman sekolah langsung ke HP siswa
+  - Riwayat notifikasi dengan penanda sudah/belum dibaca
 
 ✓ Data Akademik
   - Profil siswa lengkap

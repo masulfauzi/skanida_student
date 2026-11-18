@@ -33,7 +33,7 @@ management library, routing generator, atau layer repository — tiap halaman ad
   Halaman lain `import 'main.dart'` untuk mengakses `SessionManager` & `API_BASE_URL`.
 - Auth: header `Authorization: Bearer ${SessionManager.authToken}` + `Accept: application/json`.
   `SessionManager.currentUsername` = NISN.
-- `splash_screen.dart` — load sesi → Login / `ResumePresensiPage` (jika ada draft) / Home.
+- `splash_screen.dart` — load sesi → `PushNotificationService.init()` → Login / `ResumePresensiPage` (jika ada draft) / Home.
 
 ### Alur presensi (bagian paling sensitif)
 `presensi_page.dart` (cek GPS, radius ≤ 25 m dari `schoolLocation`, peta flutter_map + OSM)
@@ -50,10 +50,24 @@ batasi resolusi gambar, hindari inisialisasi berat saat startup (Mobile Ads diin
 di `AdsHelper`), dan pastikan data penting tahan process-death.
 
 ### Izin (permission)
-Diminta per-fitur saat dibutuhkan, bukan di awal: `PermissionGuard.ensurePermission(context, RequiredPermission.camera|location)`
+Diminta per-fitur saat dibutuhkan, bukan di awal: `PermissionGuard.ensurePermission(context, RequiredPermission.camera|location|notification)`
 (`permission_guard.dart`) → menampilkan `PermissionPreAlertPage` bila belum diberikan.
-Hanya kamera & lokasi. ATT/`NSUserTrackingUsageDescription` dan izin galeri sengaja dihapus — jangan ditambahkan lagi
+Hanya kamera, lokasi & notifikasi (notifikasi: ditawarkan sekali setelah submit izin + banner di dashboard). ATT/`NSUserTrackingUsageDescription` dan izin galeri sengaja dihapus — jangan ditambahkan lagi
 tanpa alasan jelas (berpengaruh ke review App Store/Play Store).
+
+### Push notification
+`push_notification_service.dart` (FCM + `flutter_local_notifications`, config dari `flutterfire configure` → `lib/firebase_options.dart`).
+- `main()` hanya `Firebase.initializeApp` + `onBackgroundMessage`; sisanya lazy (splash / setelah login).
+- Token dikirim ke `POST /fcm-token` setelah login & saat app dibuka; `SessionManager.logout()` memanggil `unregister` (`DELETE /fcm-token`, unsubscribe topic `siswa`).
+- Payload `data.type`: `ijin` → `DaftarIjinPage`, `pengumuman` → dialog. Tap saat app mati disimpan sebagai pending dan
+  diproses di `MyHomePage.initState` (agar draft presensi tetap didahulukan). Navigasi luar widget via `navigatorKey` (`main.dart`).
+- Channel Android: `status_izin`, `pengumuman`. Notif foreground ditampilkan manual hanya di Android (iOS oleh sistem).
+- `flutter_local_notifications` dikunci di v22: v23 butuh AGP 9 (proyek masih AGP 8.11.1).
+- Kontrak backend: lihat `issue.md` Lampiran A.
+- **Riwayat notifikasi lokal** (`notifikasi_store.dart`, halaman `notifikasi_page.dart`, lonceng + badge di AppBar dashboard):
+  SharedPreferences key `notif_history_<siswa_id>` (maks 100), backend tidak menyimpan apa pun. Dicatat di background handler,
+  `onMessage`, dan saat di-tap (`read: true`); dedup via `messageId`. Selalu `prefs.reload()` (ditulis juga dari background isolate).
+  iOS: pesan saat app tertutup tidak memicu Dart → `importDelivered()` menyalin dari Notification Center saat app aktif (judul & ringkasan saja).
 
 ### Fitur lain & endpoint
 | File | Endpoint |
@@ -66,6 +80,7 @@ tanpa alasan jelas (berpengaruh ke review App Store/Play Store).
 | `presensi_sholat_page.dart` | `GET /presensi-sholat?nisn=&bulan=&tahun=` |
 | `ijin_sholat_page.dart` | `POST /ijin-sholat` |
 | `rekap_presensi_page.dart` | `GET /presensi/{siswaId}/{bulan}/{tahun}` |
+| `push_notification_service.dart` | `POST /fcm-token`, `DELETE /fcm-token` |
 
 Iklan: `ads_helper.dart` (Google Mobile Ads interstitial, ID produksi hardcoded), saat ini hanya dipakai di `keluar_kelas_page.dart`.
 

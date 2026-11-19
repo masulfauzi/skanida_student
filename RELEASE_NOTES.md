@@ -1,3 +1,14 @@
+# Catatan Rilis - Skanida Student v1.6.0
+
+**Platform:** Android, iOS
+
+### Yang baru
+- **Ujian Online** (khusus Android): buka situs ujian sekolah langsung dari aplikasi, tanpa login ulang.
+- **Mode ujian aman**: aplikasi wajib disematkan, screenshot dinonaktifkan, dan tidak bisa dibuka di layar terpisah/jendela mengambang. Bila siswa keluar dari aplikasi, ujian ditutup.
+- Bar status di halaman ujian: jam, jenis koneksi (WiFi/data seluler), dan baterai.
+
+---
+
 # Catatan Rilis - Skanida Student v1.5.0
 
 **Platform:** Android, iOS

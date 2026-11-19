@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -20,6 +21,7 @@ import 'permission_guard.dart';
 import 'push_notification_service.dart';
 import 'notifikasi_page.dart';
 import 'notifikasi_store.dart';
+import 'ujian_online_page.dart';
 
 // API Configuration
 const String API_BASE_URL = 'https://apps.smkn2semarang.sch.id/api';
@@ -400,6 +402,39 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openUjianOnline() async {
+    final mulai = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        icon: Icon(Icons.lock, color: Colors.deepPurple.shade700, size: 36),
+        title: const Text('Mode Ujian'),
+        content: const Text(
+          'Selama ujian aplikasi akan disematkan sehingga tidak bisa '
+          'berpindah ke aplikasi lain, dan screenshot dinonaktifkan.\n\n'
+          'Aplikasi wajib disematkan dan tidak boleh dibuka dalam layar '
+          'terpisah atau jendela mengambang; jika tidak, aplikasi akan '
+          'ditutup.\n\n'
+          'Jika Anda keluar dari aplikasi atau melepas sematan, ujian '
+          'langsung ditutup.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(c).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(c).pop(true),
+            child: const Text('Mulai'),
+          ),
+        ],
+      ),
+    );
+    if (mulai != true || !mounted) return;
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const UjianOnlinePage()));
+  }
+
   Widget _buildIconCard(IconData icon, String label, {VoidCallback? onTap}) {
     final child = Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -595,6 +630,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                     );
                   },
                 ),
+                // iOS butuh entitlement automatic-assessment-configuration.
+                if (Platform.isAndroid)
+                  _buildIconCard(
+                    Icons.quiz,
+                    'Ujian Online',
+                    onTap: _openUjianOnline,
+                  ),
               ],
             ),
           ),

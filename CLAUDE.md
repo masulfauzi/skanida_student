@@ -79,8 +79,27 @@ tanpa alasan jelas (berpengaruh ke review App Store/Play Store).
 | `riwayat_izin_page.dart` | `GET /riwayat-izin?id_siswa=` |
 | `presensi_sholat_page.dart` | `GET /presensi-sholat?nisn=&bulan=&tahun=` |
 | `ijin_sholat_page.dart` | `POST /ijin-sholat` |
+| `ujian_online_page.dart` | `POST /ujian/sso-code`, lalu WebView `https://ujian.smkn2semarang.sch.id/sso?code=` |
 | `rekap_presensi_page.dart` | `GET /presensi/{siswaId}/{bulan}/{tahun}` |
 | `push_notification_service.dart` | `POST /fcm-token`, `DELETE /fcm-token` |
+
+### Ujian Online (khusus Android)
+Kartu menu hanya muncul bila `Platform.isAndroid` (iOS butuh entitlement `automatic-assessment-configuration`).
+`ujian_online_page.dart` + `exam_lock.dart` (MethodChannel `skanida/exam_lock` di `MainActivity.kt`:
+`startLockTask`/`stopLockTask` = screen pinning, `lockTaskState`, `setSecure` = FLAG_SECURE, `isInteractive`, event `userLeaveHint`).
+- Syarat: tersemat & bukan multi-window. Tidak tersemat setelah ±15 dtk, atau split-screen/jendela mengambang/PiP
+  (dicek saat buka, timer 1 dtk, `onMultiWindowModeChanged`) → dialog lalu **force close aplikasi** (`forceClose`:
+  `finishAndRemoveTask` + `killProcess`). Manifest `resizeableActivity="false"`; overlay aplikasi lain disembunyikan
+  (`HIDE_OVERLAY_WINDOWS`, Android 12+).
+- Status bar sistem tersembunyi (immersive) → bar status sendiri di bagian bawah layar (`bottomNavigationBar`): jam perangkat (tiap detik),
+  jenis koneksi + "tanpa internet" (`NET_CAPABILITY_VALIDATED`), baterai; dari method `deviceStatus` (tiap 5 dtk).
+- Situs ujian baru dimuat setelah aplikasi benar-benar disematkan; navigasi dibatasi ke host `ujian.smkn2semarang.sch.id`.
+- Pelanggaran (pin terlepas, Home/Recent, `paused` saat layar menyala) → ujian ditutup + cookie/cache/localStorage WebView dihapus.
+  Layar mati & `inactive` bukan pelanggaran. Data WebView juga dihapus saat halaman dibuka & saat keluar normal.
+- Login otomatis (SSO): kode sekali pakai 60 dtk dari sianida → `ujian-front /sso` → `ujian-back POST /api/auth/sso` → sianida
+  `sso-verify` (secret server-to-server). Token Sanctum tidak pernah dikirim ke sistem ujian. Gagal → buka situs biasa (login manual).
+  Pelanggaran tidak disimpan; membuka menu lagi = SSO ulang langsung ke dashboard.
+- Tanpa device owner, pinning bisa dilepas siswa — pengamanan = pinning + deteksi + reset sesi, bukan penguncian mutlak.
 
 Iklan: `ads_helper.dart` (Google Mobile Ads interstitial, ID produksi hardcoded), saat ini hanya dipakai di `keluar_kelas_page.dart`.
 

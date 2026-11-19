@@ -36,6 +36,10 @@ Aplikasi Skanida Student dirancang khusus untuk memudahkan siswa dalam mengelola
   - Pengumuman sekolah langsung ke HP siswa
   - Riwayat notifikasi dengan penanda sudah/belum dibaca
 
+✓ Ujian Online (Android)
+  - Akses situs ujian sekolah langsung dari aplikasi, tanpa login ulang
+  - Mode ujian aman: aplikasi disematkan dan screenshot dinonaktifkan
+
 ✓ Data Akademik
   - Profil siswa lengkap
   - Riwayat izin dengan status persetujuan guru dan BK
